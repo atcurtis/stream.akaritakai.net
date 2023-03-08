@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -24,7 +25,6 @@ import net.akaritakai.stream.models.chat.commands.ChatDisableRequest;
 import net.akaritakai.stream.models.chat.commands.ChatEnableRequest;
 import net.akaritakai.stream.models.chat.request.ChatJoinRequest;
 import net.akaritakai.stream.models.chat.request.ChatSendRequest;
-import net.akaritakai.stream.models.chat.response.ChatMessageResponse;
 import net.akaritakai.stream.models.chat.response.ChatStatusResponse;
 import net.akaritakai.stream.scheduling.SchedulerAttribute;
 import net.akaritakai.stream.scheduling.Utils;
@@ -33,17 +33,21 @@ import org.quartz.Scheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.management.AttributeChangeNotification;
+import javax.management.Notification;
+import javax.management.NotificationBroadcasterSupport;
 
-public class ChatManager {
+
+public class ChatManager extends NotificationBroadcasterSupport implements ChatManagerMXBean {
   public static final SchedulerAttribute<ChatManager> KEY = SchedulerAttribute.instanceOf("chatManager", ChatManager.class);
   private static final Logger LOG = LoggerFactory.getLogger(ChatManager.class);
 
   private final Vertx _vertx;
   private final AtomicReference<ChatHistory> _history = new AtomicReference<>(null);
-  private final Set<ChatListener> _listeners = ConcurrentHashMap.newKeySet();
 
   private final ConcurrentMap<String, String> _customEmojiMap = new ConcurrentHashMap<>();
   private final Scheduler _scheduler;
+  private final AtomicInteger _sequenceNumber = new AtomicInteger();
 
   public ChatManager(Vertx vertx, Scheduler scheduler) {
     _vertx = vertx;
@@ -86,12 +90,9 @@ public class ChatManager {
         }
       }
       ChatMessage message = currentHistory.addMessage(request, source);
-      ChatMessageResponse response = ChatMessageResponse.builder().message(message).build();
-      _listeners.forEach(listener -> _vertx.runOnContext(event -> {
-        if (Objects.equals(currentHistory, _history.get())) {
-          listener.onMessage(response);
-        }
-      }));
+      Notification n = new AttributeChangeNotification(this, _sequenceNumber.getAndIncrement(), System.currentTimeMillis(),
+              "sendMessage", "Message", ChatMessage.class.getName(), null, message);
+      sendNotification(n);
       JobDataMap jobDataMap = new JobDataMap();
       jobDataMap.put("type", String.valueOf(request.getMessageType()));
       jobDataMap.put("nick", request.getNickname());
@@ -109,13 +110,10 @@ public class ChatManager {
       if (currentHistory == null) {
         promise.fail(new ChatStateConflictException("Chat is already disabled"));
       } else {
-        _history.set(null);
-        ChatStatusResponse response = ChatStatusResponse.builder().enabled(false).build();
-        _listeners.forEach(listener -> _vertx.runOnContext(event -> {
-          if (_history.get() == null) {
-            listener.onStatus(response);
-          }
-        }));
+        ChatHistory oldHistory = _history.getAndSet(null);
+        Notification n = new AttributeChangeNotification(this, _sequenceNumber.getAndIncrement(), System.currentTimeMillis(),
+                "disableChat", "History", ChatHistory.class.getName(), oldHistory, null);
+        sendNotification(n);
         promise.complete();
         Utils.triggerIfExists(_scheduler, "disableChat", "Chat");
       }
@@ -133,19 +131,10 @@ public class ChatManager {
         promise.fail(new ChatStateConflictException("Chat is already enabled"));
       } else {
         ChatHistory newHistory = new ChatHistory();
-        _history.set(newHistory);
-        ChatStatusResponse response = ChatStatusResponse.builder()
-            .enabled(true)
-            .sequence(ChatSequence.builder()
-                .epoch(newHistory.getEpoch())
-                .position(0)
-                .build())
-            .messages(Collections.emptyList())
-            .build();
-        _listeners.forEach(listener -> _vertx.runOnContext(event -> {
-          if (Objects.equals(newHistory, _history.get()))
-            listener.onStatus(response);
-        }));
+        ChatHistory oldHistory = _history.getAndSet(newHistory);
+        Notification n = new AttributeChangeNotification(this, _sequenceNumber.getAndIncrement(), System.currentTimeMillis(),
+                "enableChat", "History", ChatHistory.class.getName(), oldHistory, newHistory);
+        sendNotification(n);
         promise.complete();
         Utils.triggerIfExists(_scheduler, "enableChat", "Chat");
       }
@@ -163,19 +152,10 @@ public class ChatManager {
         promise.fail(new ChatStateConflictException("Chat is disabled"));
       } else {
         ChatHistory newHistory = new ChatHistory();
-        _history.set(newHistory);
-        ChatStatusResponse response = ChatStatusResponse.builder()
-            .enabled(true)
-            .sequence(ChatSequence.builder()
-                .epoch(newHistory.getEpoch())
-                .position(0)
-                .build())
-            .messages(Collections.emptyList())
-            .build();
-        _listeners.forEach(listener -> _vertx.runOnContext(event -> {
-          if (Objects.equals(newHistory, _history.get()))
-            listener.onStatus(response);
-        }));
+        ChatHistory oldHistory = _history.getAndSet(newHistory);
+        Notification n = new AttributeChangeNotification(this, _sequenceNumber.getAndIncrement(), System.currentTimeMillis(),
+                "clearChat", "History", ChatHistory.class.getName(), oldHistory, newHistory);
+        sendNotification(n);
         promise.complete();
         Utils.triggerIfExists(_scheduler, "clearChat", "Chat");
       }
@@ -233,9 +213,5 @@ public class ChatManager {
     } else {
       throw new IllegalArgumentException("emoji starts and ends with a colon");
     }
-  }
-
-  public void addListener(ChatListener listener) {
-    _listeners.add(listener);
   }
 }
