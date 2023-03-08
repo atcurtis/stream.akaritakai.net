@@ -14,7 +14,7 @@ public class ChatEnableJob implements Job {
                 .build();
         ChatManager chatManager = Utils.get(context.getScheduler(), ChatManager.KEY);
         try {
-            chatManager.enableChat(request).toCompletionStage().toCompletableFuture().join();
+            chatManager.enableChat(request);
         } catch (Exception e) {
             throw new JobExecutionException(e);
         }

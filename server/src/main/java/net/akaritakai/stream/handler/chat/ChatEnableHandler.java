@@ -1,6 +1,7 @@
 package net.akaritakai.stream.handler.chat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.vertx.core.Vertx;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.http.HttpServerResponse;
 import net.akaritakai.stream.CheckAuth;
@@ -11,6 +12,8 @@ import org.apache.commons.lang3.Validate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.CompletableFuture;
+
 
 /**
  * Handles the "POST /chat/enable" command.
@@ -19,11 +22,13 @@ public class ChatEnableHandler extends AbstractHandler<ChatEnableRequest> {
   private static final Logger LOG = LoggerFactory.getLogger(ChatEnableHandler.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
+  private final Vertx _vertx;
   private final ChatManager _chat;
 
-  public ChatEnableHandler(ChatManager chat, CheckAuth checkAuth) {
+  public ChatEnableHandler(ChatManager chat, CheckAuth checkAuth, Vertx vertx) {
     super(ChatEnableRequest.class, checkAuth);
     _chat = chat;
+    _vertx = vertx;
   }
   @Override
   protected void validateRequest(ChatEnableRequest request) {
@@ -32,9 +37,17 @@ public class ChatEnableHandler extends AbstractHandler<ChatEnableRequest> {
   }
 
   protected void handleAuthorized(HttpServerRequest httpRequest, ChatEnableRequest request, HttpServerResponse response) {
-    _chat.enableChat(request)
-        .onSuccess(event -> handleSuccess(response))
-        .onFailure(t -> handleFailure(response, t));
+    CompletableFuture
+            .runAsync(() -> _chat.enableChat(request))
+            .whenComplete(((unused, ex) -> {
+              _vertx.runOnContext(event -> {
+                if (ex == null) {
+                  handleSuccess(response);
+                } else {
+                  handleFailure(response, ex);
+                }
+              });
+            }));
   }
 
   protected void handleFailure(HttpServerResponse response, Throwable t) {

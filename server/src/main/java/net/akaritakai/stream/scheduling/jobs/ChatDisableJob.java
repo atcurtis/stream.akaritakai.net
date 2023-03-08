@@ -14,7 +14,7 @@ public class ChatDisableJob implements Job {
                 .build();
         ChatManager chatManager = Utils.get(context.getScheduler(), ChatManager.KEY);
         try {
-            chatManager.disableChat(request).toCompletionStage().toCompletableFuture().join();
+            chatManager.disableChat(request);
         } catch (Exception e) {
             throw new JobExecutionException(e);
         }
