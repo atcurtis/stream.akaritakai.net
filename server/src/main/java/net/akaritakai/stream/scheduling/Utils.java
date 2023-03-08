@@ -4,8 +4,10 @@ import org.quartz.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.IdentityHashMap;
-import java.util.Map;
+import javax.management.JMX;
+import javax.management.MBeanServer;
+import javax.management.ObjectName;
+import java.lang.management.ManagementFactory;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -67,5 +69,10 @@ public class Utils {
         } catch (SchedulerException e) {
             LOG.warn("Failed to trigger", e);
         }
+    }
+
+    public static <T> T beanProxy(ObjectName objectName, Class<T> mxBean) {
+        MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
+        return JMX.newMBeanProxy(mBeanServer, objectName, mxBean);
     }
 }

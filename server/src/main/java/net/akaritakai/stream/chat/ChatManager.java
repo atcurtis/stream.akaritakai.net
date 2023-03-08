@@ -8,8 +8,11 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import net.akaritakai.stream.exception.ChatStateConflictException;
 import net.akaritakai.stream.handler.Util;
 import net.akaritakai.stream.models.chat.ChatMessage;
@@ -21,7 +24,6 @@ import net.akaritakai.stream.models.chat.commands.ChatEnableRequest;
 import net.akaritakai.stream.models.chat.request.ChatJoinRequest;
 import net.akaritakai.stream.models.chat.request.ChatSendRequest;
 import net.akaritakai.stream.models.chat.response.ChatStatusResponse;
-import net.akaritakai.stream.scheduling.SchedulerAttribute;
 import net.akaritakai.stream.scheduling.Utils;
 import org.quartz.JobDataMap;
 import org.quartz.Scheduler;
@@ -33,9 +35,9 @@ import javax.management.Notification;
 import javax.management.NotificationBroadcasterSupport;
 
 
-public class ChatManager extends NotificationBroadcasterSupport implements ChatManagerMXBean {
-  public static final SchedulerAttribute<ChatManager> KEY = SchedulerAttribute.instanceOf("chatManager", ChatManager.class);
+public class ChatManager extends NotificationBroadcasterSupport implements ChatManagerMBean {
   private static final Logger LOG = LoggerFactory.getLogger(ChatManager.class);
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private final AtomicReference<ChatHistory> _history = new AtomicReference<>(null);
 
@@ -48,7 +50,15 @@ public class ChatManager extends NotificationBroadcasterSupport implements ChatM
   }
 
   @Override
-  public void sendMessage(ChatSendRequest request, InetAddress source) throws ChatStateConflictException {
+  public void sendMessage(String request, InetAddress source) {
+    try {
+      sendMessage(OBJECT_MAPPER.readValue(request, ChatSendRequest.class), source);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  public void sendMessage(ChatSendRequest request, InetAddress source) {
     LOG.debug("Got ChatSendRequest = {}", request);
     ChatHistory currentHistory = _history.get();
     if (currentHistory == null) {
@@ -96,6 +106,14 @@ public class ChatManager extends NotificationBroadcasterSupport implements ChatM
   }
 
   @Override
+  public void disableChat(String request) {
+    try {
+      disableChat(OBJECT_MAPPER.readValue(request, ChatDisableRequest.class));
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   public void disableChat(ChatDisableRequest request) {
     LOG.info("Got ChatDisableRequest");
     assert request != null;
@@ -112,6 +130,14 @@ public class ChatManager extends NotificationBroadcasterSupport implements ChatM
   }
 
   @Override
+  public void enableChat(String request) {
+    try {
+      enableChat(OBJECT_MAPPER.readValue(request, ChatEnableRequest.class));
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   public void enableChat(ChatEnableRequest request) {
     LOG.info("Got ChatEnableRequest");
     assert request != null;
@@ -129,6 +155,14 @@ public class ChatManager extends NotificationBroadcasterSupport implements ChatM
   }
 
   @Override
+  public void clearChat(String request) {
+    try {
+      clearChat(OBJECT_MAPPER.readValue(request, ChatClearRequest.class));
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   public void clearChat(ChatClearRequest request) {
     LOG.info("Got ChatClearRequest");
     assert request != null;
@@ -145,9 +179,12 @@ public class ChatManager extends NotificationBroadcasterSupport implements ChatM
     }
   }
 
-
   @Override
-  public ChatStatusResponse joinChat(ChatJoinRequest request) {
+  public String joinChat(String request) throws JsonProcessingException {
+    return OBJECT_MAPPER.writeValueAsString(joinChat0(OBJECT_MAPPER.readValue(request, ChatJoinRequest.class)));
+  }
+
+  public ChatStatusResponse joinChat0(ChatJoinRequest request) {
     LOG.info("Got ChatJoinRequest = {}", request);
     ChatHistory history = _history.get();
     if (history == null) {
@@ -183,6 +220,17 @@ public class ChatManager extends NotificationBroadcasterSupport implements ChatM
   }
 
   @Override
+  public List<Map.Entry<String, String>> listEmojis(String regexp, int limit) {
+    return listEmojis(regexp != null && !regexp.isBlank() ? new Predicate<>() {
+      final Pattern pattern = Pattern.compile(regexp.trim(), Pattern.CASE_INSENSITIVE);
+
+      @Override
+      public boolean test(String s) {
+        return pattern.matcher(s).find();
+      }
+    } : any -> true, limit);
+  }
+
   public List<Map.Entry<String, String>> listEmojis(Predicate<String> matcher, int limit) {
       return _customEmojiMap.entrySet().stream()
               .filter(entry -> matcher.test(entry.getKey()))

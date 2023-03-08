@@ -10,6 +10,7 @@ import net.akaritakai.stream.handler.chat.*;
 import net.akaritakai.stream.scheduling.Utils;
 import org.quartz.Scheduler;
 
+import javax.management.*;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
@@ -23,12 +24,16 @@ public class Chat {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public Chat(Vertx vertx, Router router, Scheduler scheduler, CheckAuth checkAuth) {
+    public Chat(Vertx vertx, Router router, Scheduler scheduler, CheckAuth checkAuth,
+                MBeanServer mBeanServer, ObjectName chatManagerName)
+            throws NotCompliantMBeanException, InstanceAlreadyExistsException, MBeanRegistrationException {
         this.vertx = vertx;
         this.router = router;
         this.chatManager = new ChatManager(scheduler);
         this.checkAuth = checkAuth;
-        Utils.set(scheduler, ChatManager.KEY, chatManager);
+
+        mBeanServer.registerMBean(chatManager, chatManagerName);
+        Utils.set(scheduler, ChatManagerMBean.KEY, chatManagerName);
     }
 
     public Chat addCustomEmojis(File jsonFile) throws IOException {

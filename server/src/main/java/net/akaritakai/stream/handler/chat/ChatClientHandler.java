@@ -85,7 +85,7 @@ public class ChatClientHandler implements Handler<RoutingContext> {
         ChatRequest request = OBJECT_MAPPER.readValue(textMessage, ChatRequest.class);
         if (request instanceof ChatJoinRequest) {
           try {
-            ChatStatusResponse status = _chat.joinChat((ChatJoinRequest) request);
+            ChatStatusResponse status = OBJECT_MAPPER.readValue(_chat.joinChat(OBJECT_MAPPER.writeValueAsString(request)), ChatStatusResponse.class);
             String response = OBJECT_MAPPER.writeValueAsString(status);
             socket.writeTextMessage(response);
           } catch (Exception e) {

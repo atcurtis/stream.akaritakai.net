@@ -54,7 +54,7 @@ public class StreamStatusHandler implements Handler<RoutingContext> {
     socket.closeHandler(closeEvent -> _sockets.remove(socket));
     _vertx.runOnContext(upgradeEvent -> {
       try {
-        StreamState state = _stream.getState();
+        StreamState state = OBJECT_MAPPER.readValue(_stream.getState(), StreamState.class);
         String newState = OBJECT_MAPPER.writeValueAsString(state);
         socket.writeTextMessage(newState);
       } catch (Exception e) {

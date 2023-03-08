@@ -6,17 +6,16 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.vertx.core.Future;
-import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
 import net.akaritakai.stream.client.AwsS3Client;
 import net.akaritakai.stream.client.FakeAwsS3Client;
@@ -30,7 +29,6 @@ import net.akaritakai.stream.models.stream.request.StreamPauseRequest;
 import net.akaritakai.stream.models.stream.request.StreamResumeRequest;
 import net.akaritakai.stream.models.stream.request.StreamStartRequest;
 import net.akaritakai.stream.models.stream.request.StreamStopRequest;
-import net.akaritakai.stream.scheduling.SchedulerAttribute;
 import net.akaritakai.stream.scheduling.Utils;
 import org.quartz.JobDataMap;
 import org.quartz.Scheduler;
@@ -42,10 +40,10 @@ import javax.management.Notification;
 import javax.management.NotificationBroadcasterSupport;
 
 
-public class Streamer extends NotificationBroadcasterSupport implements StreamerMXBean {
-  public static final SchedulerAttribute<Streamer> KEY = SchedulerAttribute.instanceOf("streamer", Streamer.class);
+public class Streamer extends NotificationBroadcasterSupport implements StreamerMBean {
     private static final Logger LOG = LoggerFactory.getLogger(Streamer.class);
 
+    private final ObjectMapper objectMapper = new ObjectMapper();
   private final Vertx _vertx;
   private final AwsS3Client _client;
   private final String _livePlaylistUrl;
@@ -78,6 +76,14 @@ public class Streamer extends NotificationBroadcasterSupport implements Streamer
   }
 
   @Override
+  public void startStream(String request) {
+    try {
+      startStream(objectMapper.readValue(request, StreamStartRequest.class));
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   public void startStream(StreamStartRequest request) {
     LOG.info("Got request to start the stream: {}", request);
     // Ensure that the stream is not already running
@@ -123,6 +129,14 @@ public class Streamer extends NotificationBroadcasterSupport implements Streamer
     setState(newState);
   }
 
+  public void pauseStream(String request) {
+    try {
+      pauseStream(objectMapper.readValue(request, StreamPauseRequest.class));
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   public void pauseStream(StreamPauseRequest request) {
     LOG.info("Got request to pause the stream: {}", request);
     // Ensure that the stream is already running
@@ -155,6 +169,14 @@ public class Streamer extends NotificationBroadcasterSupport implements Streamer
   }
 
   @Override
+  public void resumeStream(String request) {
+    try {
+      resumeStream(objectMapper.readValue(request, StreamResumeRequest.class));
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   public void resumeStream(StreamResumeRequest request) {
     LOG.info("Got request to resume the stream: {}", request);
     // Ensure that the stream is paused
@@ -190,6 +212,14 @@ public class Streamer extends NotificationBroadcasterSupport implements Streamer
   }
 
   @Override
+  public void stopStream(String request) {
+    try {
+      stopStream(objectMapper.readValue(request, StreamStopRequest.class));
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   public void stopStream(StreamStopRequest request) {
     LOG.info("Got request to stop the stream: {}", request);
     // Ensure that the stream is not already stopped
@@ -204,7 +234,15 @@ public class Streamer extends NotificationBroadcasterSupport implements Streamer
   }
 
   @Override
-  public StreamState getState() {
+  public String getState() {
+    try {
+      return objectMapper.writeValueAsString(getStreamState());
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  public StreamState getStreamState() {
     return _state.get();
   }
 
