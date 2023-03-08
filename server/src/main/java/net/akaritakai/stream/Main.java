@@ -136,20 +136,20 @@ public class Main {
     }
 
     router.get("/stream/status")
-        .handler(new StreamStatusHandler(vertx, streamer));
+        .handler(new StreamStatusHandler(vertx, streamerName));
 
     router.post("/stream/start")
         .handler(BodyHandler.create())
-        .handler(new StartCommandHandler(streamer, auth, vertx));
+        .handler(new StartCommandHandler(streamerName, auth, vertx));
     router.post("/stream/stop")
         .handler(BodyHandler.create())
-        .handler(new StopCommandHandler(streamer, auth));
+        .handler(new StopCommandHandler(streamerName, auth));
     router.post("/stream/pause")
         .handler(BodyHandler.create())
-        .handler(new PauseCommandHandler(streamer, auth, vertx));
+        .handler(new PauseCommandHandler(streamerName, auth, vertx));
     router.post("/stream/resume")
         .handler(BodyHandler.create())
-        .handler(new ResumeCommandHandler(streamer, auth, vertx));
+        .handler(new ResumeCommandHandler(streamerName, auth, vertx));
     router.post("/stream/dir")
         .handler(BodyHandler.create())
         .handler(new DirCommandHandler(streamer, auth));

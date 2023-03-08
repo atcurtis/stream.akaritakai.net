@@ -6,9 +6,11 @@ import io.vertx.core.http.HttpServerResponse;
 import net.akaritakai.stream.CheckAuth;
 import net.akaritakai.stream.handler.AbstractHandler;
 import net.akaritakai.stream.models.stream.request.StreamResumeRequest;
-import net.akaritakai.stream.streamer.Streamer;
+import net.akaritakai.stream.scheduling.Utils;
+import net.akaritakai.stream.streamer.StreamerMBean;
 import org.apache.commons.lang3.Validate;
 
+import javax.management.ObjectName;
 import java.util.concurrent.CompletableFuture;
 
 
@@ -17,11 +19,11 @@ import java.util.concurrent.CompletableFuture;
  */
 public class ResumeCommandHandler extends AbstractHandler<StreamResumeRequest> {
   private final Vertx _vertx;
-  private final Streamer _streamer;
+  private final StreamerMBean _streamer;
 
-  public ResumeCommandHandler(Streamer streamer, CheckAuth authCheck, Vertx vertx) {
+  public ResumeCommandHandler(ObjectName streamer, CheckAuth authCheck, Vertx vertx) {
     super(StreamResumeRequest.class, authCheck);
-    _streamer = streamer;
+    _streamer = Utils.beanProxy(streamer, StreamerMBean.class);
     _vertx = vertx;
   }
 
@@ -38,6 +40,7 @@ public class ResumeCommandHandler extends AbstractHandler<StreamResumeRequest> {
   protected void handleAuthorized(HttpServerRequest httpRequest, StreamResumeRequest request, HttpServerResponse response) {
     CompletableFuture
             .completedStage(request)
+            .thenApplyAsync(Utils::writeAsString)
             .thenAcceptAsync(_streamer::resumeStream)
                     .whenComplete(((unused, ex) -> {
                       _vertx.runOnContext(event -> {

@@ -1,5 +1,8 @@
 package net.akaritakai.stream.scheduling;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import net.akaritakai.stream.models.stream.request.StreamStartRequest;
 import org.quartz.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,12 +12,14 @@ import javax.management.MBeanServer;
 import javax.management.ObjectName;
 import java.lang.management.ManagementFactory;
 import java.util.WeakHashMap;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class Utils {
     private static final Logger LOG = LoggerFactory.getLogger(Utils.class);
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private static final WeakHashMap<Scheduler, ConcurrentMap<SchedulerAttribute<?>, AtomicReference<?>>> TRANSIENT
              = new WeakHashMap<>();
@@ -74,5 +79,13 @@ public class Utils {
     public static <T> T beanProxy(ObjectName objectName, Class<T> mxBean) {
         MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
         return JMX.newMBeanProxy(mBeanServer, objectName, mxBean);
+    }
+
+    public static String writeAsString(Object obj) {
+        try {
+            return OBJECT_MAPPER.writeValueAsString(obj);
+        } catch (JsonProcessingException e) {
+            throw new CompletionException(e);
+        }
     }
 }

@@ -21,6 +21,7 @@ public class Chat {
     private final Router router;
     private final ChatManager chatManager;
     private final CheckAuth checkAuth;
+    private final ObjectName chatManagerName;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -31,6 +32,7 @@ public class Chat {
         this.router = router;
         this.chatManager = new ChatManager(scheduler);
         this.checkAuth = checkAuth;
+        this.chatManagerName = chatManagerName;
 
         mBeanServer.registerMBean(chatManager, chatManagerName);
         Utils.set(scheduler, ChatManagerMBean.KEY, chatManagerName);
@@ -55,23 +57,23 @@ public class Chat {
     public void install() {
         router.post("/chat/clear")
                 .handler(BodyHandler.create())
-                .handler(new ChatClearHandler(chatManager, checkAuth, vertx));
+                .handler(new ChatClearHandler(chatManagerName, checkAuth, vertx));
         router.post("/chat/disable")
                 .handler(BodyHandler.create())
-                .handler(new ChatDisableHandler(chatManager, checkAuth, vertx));
+                .handler(new ChatDisableHandler(chatManagerName, checkAuth, vertx));
         router.post("/chat/enable")
                 .handler(BodyHandler.create())
-                .handler(new ChatEnableHandler(chatManager, checkAuth, vertx));
+                .handler(new ChatEnableHandler(chatManagerName, checkAuth, vertx));
         router.post("/chat/write")
                 .handler(BodyHandler.create())
-                .handler(new ChatWriteHandler(chatManager, checkAuth));
+                .handler(new ChatWriteHandler(chatManagerName, checkAuth));
         router.post("/chat/emojis")
                 .handler(BodyHandler.create())
                 .handler(new ChatListEmojisHandler(chatManager, checkAuth));
         router.post("/chat/emoji")
                 .handler(BodyHandler.create())
-                .handler(new ChatSetEmojiHandler(chatManager, checkAuth));
+                .handler(new ChatSetEmojiHandler(chatManagerName, checkAuth));
         router.get("/chat")
-                .handler(new ChatClientHandler(vertx, chatManager));
+                .handler(new ChatClientHandler(vertx, chatManagerName));
     }
 }

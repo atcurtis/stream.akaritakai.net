@@ -9,11 +9,13 @@ import io.vertx.core.Vertx;
 import io.vertx.core.http.ServerWebSocket;
 import io.vertx.ext.web.RoutingContext;
 import net.akaritakai.stream.models.stream.StreamState;
-import net.akaritakai.stream.streamer.Streamer;
+import net.akaritakai.stream.scheduling.Utils;
+import net.akaritakai.stream.streamer.StreamerMBean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.management.AttributeChangeNotification;
+import javax.management.ObjectName;
 
 
 /**
@@ -24,12 +26,12 @@ public class StreamStatusHandler implements Handler<RoutingContext> {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private final Vertx _vertx;
-  private final Streamer _stream;
+  private final StreamerMBean _stream;
   private final Set<ServerWebSocket> _sockets = ConcurrentHashMap.newKeySet();
 
-  public StreamStatusHandler(Vertx vertx, Streamer stream) {
+  public StreamStatusHandler(Vertx vertx, ObjectName stream) {
     _vertx = vertx;
-    _stream = stream;
+    _stream = Utils.beanProxy(stream, StreamerMBean.class);
     _stream.addNotificationListener((notification, handback) -> {
       assert this == handback;
       StreamState streamState;

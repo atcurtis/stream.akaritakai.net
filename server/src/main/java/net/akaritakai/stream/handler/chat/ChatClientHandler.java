@@ -11,7 +11,7 @@ import io.vertx.core.Vertx;
 import io.vertx.core.http.ServerWebSocket;
 import io.vertx.ext.web.RoutingContext;
 import net.akaritakai.stream.chat.ChatHistory;
-import net.akaritakai.stream.chat.ChatManager;
+import net.akaritakai.stream.chat.ChatManagerMBean;
 import net.akaritakai.stream.handler.Util;
 import net.akaritakai.stream.models.chat.ChatMessage;
 import net.akaritakai.stream.models.chat.ChatSequence;
@@ -21,11 +21,13 @@ import net.akaritakai.stream.models.chat.request.ChatRequest;
 import net.akaritakai.stream.models.chat.request.ChatSendRequest;
 import net.akaritakai.stream.models.chat.response.ChatMessageResponse;
 import net.akaritakai.stream.models.chat.response.ChatStatusResponse;
+import net.akaritakai.stream.scheduling.Utils;
 import org.apache.commons.lang3.Validate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.management.AttributeChangeNotification;
+import javax.management.ObjectName;
 
 
 /**
@@ -37,12 +39,12 @@ public class ChatClientHandler implements Handler<RoutingContext> {
   private static final int MAX_MESSAGE_LENGTH = 32768;
 
   private final Vertx _vertx;
-  private final ChatManager _chat;
+  private final ChatManagerMBean _chat;
   private final Set<ServerWebSocket> _sockets = ConcurrentHashMap.newKeySet();
 
-  public ChatClientHandler(Vertx vertx, ChatManager chat) {
+  public ChatClientHandler(Vertx vertx, ObjectName chat) {
     _vertx = vertx;
-    _chat = chat;
+    _chat = Utils.beanProxy(chat, ChatManagerMBean.class);
     _chat.addNotificationListener(((notification, handback) -> {
       assert this == handback;
       ChatHistory newHistory;
@@ -97,7 +99,7 @@ public class ChatClientHandler implements Handler<RoutingContext> {
           try {
             validateChatSendRequest((ChatSendRequest) request);
             try {
-              _chat.sendMessage((ChatSendRequest) request, Util.getIpAddressFromRequest(event.request()));
+              _chat.sendMessage(OBJECT_MAPPER.writeValueAsString(request), Util.getIpAddressFromRequest(event.request()));
             } catch (Exception e) {
               // This should only occur if the server is not available
               LOG.warn("Unable to send chat message. Reason: {}: {}", e.getClass().getCanonicalName(), e.getMessage());

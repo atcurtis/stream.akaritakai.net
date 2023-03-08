@@ -8,9 +8,11 @@ import net.akaritakai.stream.CheckAuth;
 import net.akaritakai.stream.exception.StreamStateConflictException;
 import net.akaritakai.stream.handler.AbstractHandler;
 import net.akaritakai.stream.models.stream.request.StreamStartRequest;
-import net.akaritakai.stream.streamer.Streamer;
+import net.akaritakai.stream.scheduling.Utils;
+import net.akaritakai.stream.streamer.StreamerMBean;
 import org.apache.commons.lang3.Validate;
 
+import javax.management.ObjectName;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -18,11 +20,11 @@ import java.util.concurrent.CompletableFuture;
  */
 public class StartCommandHandler extends AbstractHandler<StreamStartRequest> {
   private final Vertx _vertx;
-  private final Streamer _streamer;
+  private final StreamerMBean _streamer;
 
-  public StartCommandHandler(Streamer streamer, CheckAuth authCheck, Vertx vertx) {
+  public StartCommandHandler(ObjectName streamer, CheckAuth authCheck, Vertx vertx) {
     super(StreamStartRequest.class, authCheck);
-    _streamer = streamer;
+    _streamer = Utils.beanProxy(streamer, StreamerMBean.class);
     _vertx = vertx;
   }
 
@@ -39,7 +41,8 @@ public class StartCommandHandler extends AbstractHandler<StreamStartRequest> {
   protected void handleAuthorized(HttpServerRequest httpRequest, StreamStartRequest request, HttpServerResponse response) {
     CompletableFuture
             .completedStage(request)
-                    .thenAcceptAsync(_streamer::startStream)
+            .thenApplyAsync(Utils::writeAsString)
+            .thenAcceptAsync(_streamer::startStream)
             .thenRun(() -> _vertx.runOnContext(event -> handleSuccess(response)))
             .exceptionally(ex -> {
               _vertx.runOnContext(event -> {
