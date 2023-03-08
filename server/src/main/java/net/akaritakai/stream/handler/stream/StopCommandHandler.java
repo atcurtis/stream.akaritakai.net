@@ -8,6 +8,8 @@ import net.akaritakai.stream.models.stream.request.StreamStopRequest;
 import net.akaritakai.stream.streamer.Streamer;
 import org.apache.commons.lang3.Validate;
 
+import java.util.concurrent.CompletableFuture;
+
 /**
  * Handles the "POST /stream/stop" command.
  */
@@ -25,9 +27,15 @@ public class StopCommandHandler extends AbstractHandler<StreamStopRequest> {
   }
 
   protected void handleAuthorized(HttpServerRequest httpRequest, StreamStopRequest request, HttpServerResponse response) {
-    _streamer.stopStream(request)
-        .onSuccess(event -> handleSuccess(response))
-        .onFailure(t -> handleFailure(response, t));
+    CompletableFuture
+            .runAsync(() -> _streamer.stopStream(request))
+            .whenComplete(((unused, ex) -> {
+              if (ex == null) {
+                handleSuccess(response);
+              } else {
+                handleFailure(response, ex);
+              }
+            }));
   }
 
   private void handleFailure(HttpServerResponse response, Throwable t) {

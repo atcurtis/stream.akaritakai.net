@@ -16,7 +16,7 @@ public class StreamStopJob implements Job {
                 .build();
         Streamer streamer = Objects.requireNonNull(Utils.get(context.getScheduler(), Streamer.KEY));
         try {
-            streamer.stopStream(request).toCompletionStage().toCompletableFuture().join();
+            streamer.stopStream(request);
         } catch (Exception e) {
             throw new JobExecutionException(e);
         }

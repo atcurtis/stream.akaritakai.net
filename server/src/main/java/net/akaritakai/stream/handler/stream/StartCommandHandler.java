@@ -1,6 +1,7 @@
 package net.akaritakai.stream.handler.stream;
 
 import com.google.common.base.Throwables;
+import io.vertx.core.Vertx;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.http.HttpServerResponse;
 import net.akaritakai.stream.CheckAuth;
@@ -10,15 +11,19 @@ import net.akaritakai.stream.models.stream.request.StreamStartRequest;
 import net.akaritakai.stream.streamer.Streamer;
 import org.apache.commons.lang3.Validate;
 
+import java.util.concurrent.CompletableFuture;
+
 /**
  * Handles the "POST /stream/start" command.
  */
 public class StartCommandHandler extends AbstractHandler<StreamStartRequest> {
+  private final Vertx _vertx;
   private final Streamer _streamer;
 
-  public StartCommandHandler(Streamer streamer, CheckAuth authCheck) {
+  public StartCommandHandler(Streamer streamer, CheckAuth authCheck, Vertx vertx) {
     super(StreamStartRequest.class, authCheck);
     _streamer = streamer;
+    _vertx = vertx;
   }
 
   protected void validateRequest(StreamStartRequest request) {
@@ -32,15 +37,20 @@ public class StartCommandHandler extends AbstractHandler<StreamStartRequest> {
   }
 
   protected void handleAuthorized(HttpServerRequest httpRequest, StreamStartRequest request, HttpServerResponse response) {
-    _streamer.startStream(request)
-        .onSuccess(event -> handleSuccess(response))
-        .onFailure(t -> {
-          if (t instanceof StreamStateConflictException) {
-            handleStreamAlreadyRunning(response);
-          } else {
-            handleStreamCannotBeLoaded(response, t);
-          }
-        });
+    CompletableFuture
+            .completedStage(request)
+                    .thenAcceptAsync(_streamer::startStream)
+            .thenRun(() -> _vertx.runOnContext(event -> handleSuccess(response)))
+            .exceptionally(ex -> {
+              _vertx.runOnContext(event -> {
+                if (ex instanceof StreamStateConflictException) {
+                  handleStreamAlreadyRunning(response);
+                } else {
+                  handleStreamCannotBeLoaded(response, ex);
+                }
+              });
+              return null;
+            });
   }
 
   private void handleStreamAlreadyRunning(HttpServerResponse response) {

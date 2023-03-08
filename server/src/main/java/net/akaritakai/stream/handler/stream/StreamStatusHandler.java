@@ -10,15 +10,16 @@ import io.vertx.core.http.ServerWebSocket;
 import io.vertx.ext.web.RoutingContext;
 import net.akaritakai.stream.models.stream.StreamState;
 import net.akaritakai.stream.streamer.Streamer;
-import net.akaritakai.stream.streamer.StreamerListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.management.AttributeChangeNotification;
 
 
 /**
  * Handles websocket requests to "/stream/status"
  */
-public class StreamStatusHandler implements Handler<RoutingContext>, StreamerListener {
+public class StreamStatusHandler implements Handler<RoutingContext> {
   private static final Logger LOG = LoggerFactory.getLogger(StreamStatusHandler.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -29,7 +30,16 @@ public class StreamStatusHandler implements Handler<RoutingContext>, StreamerLis
   public StreamStatusHandler(Vertx vertx, Streamer stream) {
     _vertx = vertx;
     _stream = stream;
-    _stream.addListener(this);
+    _stream.addNotificationListener((notification, handback) -> {
+      assert this == handback;
+      StreamState streamState;
+      switch (notification.getMessage()) {
+        case "StreamState":
+          streamState = (StreamState) ((AttributeChangeNotification) notification).getNewValue();
+          onStateUpdate(streamState);
+          break;
+      }
+    }, null, this);
   }
 
   @Override
@@ -53,7 +63,6 @@ public class StreamStatusHandler implements Handler<RoutingContext>, StreamerLis
     });
   }
 
-  @Override
   public void onStateUpdate(StreamState state) {
     try {
       String newState = OBJECT_MAPPER.writeValueAsString(state);

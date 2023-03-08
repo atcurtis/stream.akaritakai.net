@@ -129,16 +129,16 @@ public class Main {
 
     router.post("/stream/start")
         .handler(BodyHandler.create())
-        .handler(new StartCommandHandler(streamer, auth));
+        .handler(new StartCommandHandler(streamer, auth, vertx));
     router.post("/stream/stop")
         .handler(BodyHandler.create())
         .handler(new StopCommandHandler(streamer, auth));
     router.post("/stream/pause")
         .handler(BodyHandler.create())
-        .handler(new PauseCommandHandler(streamer, auth));
+        .handler(new PauseCommandHandler(streamer, auth, vertx));
     router.post("/stream/resume")
         .handler(BodyHandler.create())
-        .handler(new ResumeCommandHandler(streamer, auth));
+        .handler(new ResumeCommandHandler(streamer, auth, vertx));
     router.post("/stream/dir")
         .handler(BodyHandler.create())
         .handler(new DirCommandHandler(streamer, auth));
