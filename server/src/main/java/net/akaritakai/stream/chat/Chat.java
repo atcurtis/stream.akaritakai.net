@@ -6,6 +6,7 @@ import io.vertx.core.Vertx;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.handler.BodyHandler;
 import net.akaritakai.stream.CheckAuth;
+import net.akaritakai.stream.handler.RouterHelper;
 import net.akaritakai.stream.handler.chat.*;
 import net.akaritakai.stream.scheduling.Utils;
 import org.quartz.Scheduler;
@@ -19,24 +20,20 @@ import java.util.Optional;
 
 public class Chat {
     private final Vertx vertx;
-    private final Router router;
-    private final Router sslRouter;
+    private final RouterHelper router;
     private final ChatManager chatManager;
     private final CheckAuth checkAuth;
-    private final boolean sslApi;
     private final ObjectName chatManagerName;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public Chat(Vertx vertx, Router router, Router sslRouter, Scheduler scheduler, CheckAuth checkAuth,
-                boolean sslApi, MBeanServer mBeanServer, ObjectName chatManagerName)
+    public Chat(Vertx vertx, RouterHelper router, Scheduler scheduler, CheckAuth checkAuth,
+                MBeanServer mBeanServer, ObjectName chatManagerName)
             throws NotCompliantMBeanException, InstanceAlreadyExistsException, MBeanRegistrationException {
         this.vertx = vertx;
         this.router = router;
-        this.sslRouter = sslRouter;
         this.chatManager = new ChatManager(scheduler);
         this.checkAuth = checkAuth;
-        this.sslApi = sslApi;
         this.chatManagerName = chatManagerName;
 
         mBeanServer.registerMBean(chatManager, chatManagerName);
@@ -60,53 +57,12 @@ public class Chat {
     }
 
     public void install() {
-        Optional.of(new ChatClearHandler(chatManagerName, checkAuth, vertx)).ifPresent(handler -> {
-            if (!sslApi) {
-                router.post("/chat/clear").handler(BodyHandler.create()).handler(handler);
-            }
-            sslRouter.post("/chat/clear").handler(BodyHandler.create()).handler(handler);
-        });
-
-        Optional.of(new ChatDisableHandler(chatManagerName, checkAuth, vertx)).ifPresent(handler -> {
-            if (!sslApi) {
-                router.post("/chat/disable").handler(BodyHandler.create()).handler(handler);
-            }
-            sslRouter.post("/chat/disable").handler(BodyHandler.create()).handler(handler);
-        });
-
-        Optional.of(new ChatEnableHandler(chatManagerName, checkAuth, vertx)).ifPresent(handler -> {
-            if (!sslApi) {
-                router.post("/chat/enable").handler(BodyHandler.create()).handler(handler);
-            }
-            sslRouter.post("/chat/enable").handler(BodyHandler.create()).handler(handler);
-        });
-
-        Optional.of(new ChatWriteHandler(chatManagerName, checkAuth)).ifPresent(handler -> {
-            if (!sslApi) {
-                router.post("/chat/write").handler(BodyHandler.create()).handler(handler);
-            }
-            sslRouter.post("/chat/erite").handler(BodyHandler.create()).handler(handler);
-        });
-
-        Optional.of(new ChatListEmojisHandler(chatManagerName, checkAuth)).ifPresent(handler -> {
-            if (!sslApi) {
-                router.post("/chat/emojis").handler(BodyHandler.create()).handler(handler);
-            }
-            sslRouter.post("/chat/emojis").handler(BodyHandler.create()).handler(handler);
-        });
-
-        Optional.of(new ChatSetEmojiHandler(chatManagerName, checkAuth)).ifPresent(handler -> {
-            if (!sslApi) {
-                router.post("/chat/emoji").handler(BodyHandler.create()).handler(handler);
-            }
-            sslRouter.post("/chat/emoji").handler(BodyHandler.create()).handler(handler);
-        });
-
-        Optional.of(new ChatClientHandler(vertx, chatManagerName)).ifPresent(handler -> {
-            if (!sslApi) {
-                router.get("/chat").handler(handler);
-            }
-            sslRouter.get("/chat").handler(handler);
-        });
+        router.registerPostApiHandler("/chat/clear", new ChatClearHandler(chatManagerName, checkAuth, vertx));
+        router.registerPostApiHandler("/chat/disable", new ChatDisableHandler(chatManagerName, checkAuth, vertx));
+        router.registerPostApiHandler("/chat/enable", new ChatEnableHandler(chatManagerName, checkAuth, vertx));
+        router.registerPostApiHandler("/chat/write", new ChatWriteHandler(chatManagerName, checkAuth));
+        router.registerPostApiHandler("/chat/emojis", new ChatListEmojisHandler(chatManagerName, checkAuth));
+        router.registerPostApiHandler("/chat/emoji", new ChatSetEmojiHandler(chatManagerName, checkAuth));
+        router.registerGetHandler("/chat", new ChatClientHandler(vertx, chatManagerName));
     }
 }
