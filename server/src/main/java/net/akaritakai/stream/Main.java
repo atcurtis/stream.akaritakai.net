@@ -1,10 +1,8 @@
 package net.akaritakai.stream;
 
-import io.vertx.core.CompositeFuture;
-import io.vertx.core.Handler;
-import io.vertx.core.Promise;
-import io.vertx.core.Vertx;
+import io.vertx.core.*;
 import io.vertx.core.http.HttpHeaders;
+import io.vertx.core.http.HttpServer;
 import io.vertx.core.http.HttpServerOptions;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.json.Json;
@@ -56,11 +54,16 @@ import java.lang.management.ManagementFactory;
 import java.net.MalformedURLException;
 import java.nio.channels.ClosedChannelException;
 import java.util.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 
 public class Main {
   private static final Logger LOG = LoggerFactory.getLogger(Main.class);
+
+  private static int exitCode = 1;
 
   public static void main(String[] args) throws Exception {
     TouchTimer startTimer = new TouchTimer();
@@ -135,11 +138,6 @@ public class Main {
 
     MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
 
-    Optional<SelfSignedCertificate> ssc = Optional.of(SelfSignedCertificate.create());
-    ssc.ifPresent(s -> Runtime.getRuntime().addShutdownHook(new Thread(s::delete)));
-
-
-
     ScriptEngine scriptEngine = new ScriptEngineManager().getEngineByMimeType("application/javascript");
     LOG.info("ScriptEngine: {}", scriptEngine);
     startTimer.touch("ScriptEngine: {}", scriptEngine);
@@ -157,6 +155,47 @@ public class Main {
     Vertx vertx = Vertx.vertx().exceptionHandler(ex -> {
       LOG.error("Exception", ex);
     });
+    Promise<Void> shutdownPromise = Promise.promise();
+    Stack<ShutdownTask> shutdownTasks = new Stack<>();
+    CountDownLatch shutdownLatch = new CountDownLatch(1);
+    shutdownPromise.future().onComplete(event -> {
+        vertx.executeBlocking(blockingEv -> {
+            LOG.info("Shutting down");
+            startTimer.touch("Shutting down");
+            try {
+                while (!shutdownTasks.isEmpty()) {
+                    try {
+                        ShutdownTask task = shutdownTasks.pop();
+                        startTimer.touch("Shutdown task {}", task);
+                        task.run();
+                    } catch (Exception ex) {
+                        LOG.warn("Exception in shutdown", ex);
+                        startTimer.touch("Exception in shutdown: {}", ex.getMessage());
+                    }
+                }
+            } finally {
+                startTimer.touch("Exiting");
+                LOG.info("Exiting {}", startTimer);
+                shutdownLatch.countDown();
+                System.exit(exitCode);
+            }
+        });
+    });
+    shutdownTasks.add(() -> CompletableFuture.completedFuture(vertx)
+            .thenApply(Vertx::close).thenCompose(Future::toCompletionStage).join());
+      Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+          shutdownPromise.complete();
+          try {
+              shutdownLatch.await();
+          } catch (InterruptedException e) {
+              throw new RuntimeException(e);
+          }
+      }));
+
+    Optional<SelfSignedCertificate> ssc = Optional.of(SelfSignedCertificate.create());
+    ssc.ifPresent(s -> shutdownTasks.add(s::delete));
+    ssc.ifPresent(s -> startTimer.touch("Generated Self Signed Certificate at {}", s.privateKeyPath()));
+
     Router router = Router.router(vertx);
     Router sslRouter = Router.router(vertx);
     Optional.of((Handler<RoutingContext>) event -> {
@@ -353,6 +392,7 @@ public class Main {
 
     startTimer.touch("SetupScheduler");
     SetupScheduler.setup(scheduler);
+    shutdownTasks.add(() -> scheduler.shutdown(true));
 
     Promise<Void> startHttp = Promise.promise();
     Promise<Void> startHttps = Promise.promise();
@@ -367,7 +407,7 @@ public class Main {
     });
 
     startTimer.touch("createHttpServer");
-    vertx.createHttpServer(httpServerOptions)
+    HttpServer httpServer = vertx.createHttpServer(httpServerOptions)
             .requestHandler(router)
             .listen(Optional.ofNullable(ns.getInt("port")).orElse(config.getPort()), event -> {
               if (event.succeeded()) {
@@ -381,9 +421,11 @@ public class Main {
                 startHttp.fail(event.cause());
               }
             });
+    shutdownTasks.add(() -> CompletableFuture.completedFuture(httpServer)
+            .thenApply(HttpServer::close).thenCompose(Future::toCompletionStage).join());
 
     startTimer.touch("createHttpsServer");
-    vertx.createHttpServer(httpsServerOptions)
+    HttpServer httpsServer = vertx.createHttpServer(httpsServerOptions)
             .requestHandler(sslRouter)
             .listen(Optional.ofNullable(ns.getInt("sslPort")).orElse(0), event -> {
               if (event.succeeded()) {
@@ -396,6 +438,8 @@ public class Main {
                 startHttps.fail(event.cause());
               }
             });
+      shutdownTasks.add(() -> CompletableFuture.completedFuture(httpsServer)
+              .thenApply(HttpServer::close).thenCompose(Future::toCompletionStage).join());
 
     CompositeFuture.all(startHttp.future(), startHttps.future())
             .onSuccess(event -> {
@@ -405,20 +449,23 @@ public class Main {
                 Utils.triggerIfExists(scheduler, "start");
               } catch (SchedulerException e) {
                 LOG.error("Failed to start scheduler", e);
-                shutdown(vertx);
+                exitCode = -1;
+                shutdownPromise.complete();
                 throw new RuntimeException(e);
               }
               LOG.info("Startup completed {}", startTimer);
+              exitCode = 0;
             })
             .onFailure(ex -> {
-              LOG.error("Failed to start up the server: {}", startTimer, ex);
-              startHttp.fail(ex);
-              shutdown(vertx);
+              LOG.error("Failed to start up the server");
+              exitCode = -1;
+              shutdownPromise.complete();
               throw new RuntimeException(ex);
             });
 
   }
-  private static void shutdown(Vertx vertx) {
-    vertx.close().onComplete(ev -> System.exit(-1));
+
+  interface ShutdownTask {
+      void run() throws Exception;
   }
 }
