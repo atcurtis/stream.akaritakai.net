@@ -1,0 +1,4 @@
+#!/bin/sh
+PATH="$PWD/node/":$PATH
+exec node "node/node_modules/npm/bin/npm-cli.js" "$@"
+
