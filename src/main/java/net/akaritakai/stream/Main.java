@@ -320,44 +320,7 @@ public class Main {
         registerGetHandler("/health", new HealthCheckHandler());
         registerGetHandler("/time", new TimeHandler());
 
-        final int[] httpPort = new int[1];
-
-        if (false && config.isDevelopment()) {
-            Optional.of((Handler<RoutingContext>) event -> {
-                event.response().putHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*");
-                event.next();
-            }).ifPresent(router::handler);
-
-            Optional.of(StaticHandler.create(FileSystemAccess.ROOT, config.getMediaRootDir())
-                    .setCachingEnabled(true)
-                    .setCacheEntryTimeout(TimeUnit.SECONDS.toMillis(10))
-                    .setMaxAgeSeconds(2) // let us use 2 second segments
-                    .setMaxCacheSize(32 * 1024 * 1024)
-                    .setDirectoryListing(false)
-                    .setIncludeHidden(false)
-                    .setAlwaysAsyncFS(true)
-                    .setEnableFSTuning(true)
-                    .setEnableRangeSupport(true)).ifPresent(handler -> {
-                router.router.route("/media/*").handler(handler);
-                LOG.info("sslMedia = {}", sslMedia);
-                router.sslRouter.route("/media/*").handler(sslMedia ? handler : new RedirectHandler(() -> httpPort[0]));
-            });
-
-            Optional.of(StaticHandler.create(/*FileSystemAccess.ROOT, config.getWebRootDir()*/)
-                    .setCachingEnabled(true)
-                    .setCacheEntryTimeout(TimeUnit.HOURS.toMillis(2))
-                    .setMaxAgeSeconds(TimeUnit.HOURS.toSeconds(2))
-                    .setMaxCacheSize(32 * 1024 * 1024)
-                    .setSendVaryHeader(true)
-                    .setDirectoryListing(false)
-                    .setIncludeHidden(false)
-                    .skipCompressionForSuffixes(new HashSet<>(Arrays.asList("jpg", "png", "woff2")))
-                    .setAlwaysAsyncFS(true)
-                    .setFilesReadOnly(true)
-                    .setEnableFSTuning(true)
-                    .setEnableRangeSupport(true))
-                    .ifPresent(router::handler);
-        }
+        final int[] httpPort = new int[2];
 
         if (config.isDevelopment()) {
             Optional.of((Handler<RoutingContext>) event -> {
@@ -381,6 +344,29 @@ public class Main {
                         .setEnableFSTuning(true)
                         .setEnableRangeSupport(true))
                 .ifPresent(router::handler);
+
+        if (config.getMediaRootDir() != null && !config.getMediaRootDir().isEmpty()) {
+            File dir = new File(config.getMediaRootDir());
+            if (dir.isDirectory() && dir.canRead()) {
+                Optional.of(StaticHandler.create(FileSystemAccess.ROOT, config.getMediaRootDir())
+                        .setCachingEnabled(true)
+                        .setCacheEntryTimeout(TimeUnit.SECONDS.toMillis(10))
+                        .setMaxAgeSeconds(2) // let us use 2 second segments
+                        .setMaxCacheSize(32 * 1024 * 1024)
+                        .setDirectoryListing(false)
+                        .setIncludeHidden(false)
+                        .skipCompressionForSuffixes(new HashSet<>(Arrays.asList("ts", "mp4", "m3u8")))
+                        .setAlwaysAsyncFS(true)
+                        .setEnableFSTuning(true)
+                        .setEnableRangeSupport(true)).ifPresent(handler -> {
+                    router.router.route("/media/*").handler(handler);
+                    LOG.info("sslMedia = {}", sslMedia);
+                    router.sslRouter.route("/media/*").handler(sslMedia ? handler : new RedirectHandler(() -> httpPort[0]));
+                });
+            } else {
+                LOG.warn("Media directory not found or not readable: {}", config.getMediaRootDir());
+            }
+        }
 
 
         startTimer.touch("SetupScheduler");
@@ -418,10 +404,11 @@ public class Main {
         startTimer.touch("createHttpsServer");
         HttpServer httpsServer = vertx.createHttpServer(httpsServerOptions)
                 .requestHandler(router.sslRouter)
-                .listen(Optional.ofNullable(ns.getInt("sslPort")).orElse(0), event -> {
+                .listen(Optional.ofNullable(ns.getInt("sslPort")).orElse(config.getSslPort()), event -> {
                     if (event.succeeded()) {
                         startTimer.touch("https:listen done, port {}", event.result().actualPort());
                         LOG.info("Started the https server on port {}", event.result().actualPort());
+                        httpPort[1] = event.result().actualPort();
                         startHttps.complete();
                     } else {
                         startTimer.touch("https:listen failed, {}", event.cause().getMessage());
