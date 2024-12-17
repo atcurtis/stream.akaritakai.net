@@ -46,11 +46,6 @@
 </template>
 
 <script>
-  import sheet_apple from "../../../../node_modules/rm-emoji-picker/sheets/sheet_apple_64_indexed_128.png";
-  import sheet_google from "../../../../node_modules/rm-emoji-picker/sheets/sheet_google_64_indexed_128.png";
-  import sheet_twitter from "../../../../node_modules/rm-emoji-picker/sheets/sheet_twitter_64_indexed_128.png";
-  var EmojiConvertor = require('emoji-js');
-
   const ChatTextLine = () => import(
     /* webpackChunkName: "chatTextLine" */
     /* webpackPrefetch: true */
@@ -63,21 +58,8 @@
   export default {
     name: 'chat-content',
     data() {
-      var emoji = new EmojiConvertor();
-      emoji.replace_mode = 'css';
-      emoji.use_sheet = true;
-      emoji.img_sets.apple.sheet = sheet_apple;
-      emoji.img_sets.google.sheet = sheet_google;
-      emoji.img_sets.twitter.sheet = sheet_twitter;
-      emoji.allow_caps = true;
-      emoji.allow_native = false;
-      emoji.addAliases({
-        'thumbs_up' : '1f44d',
-        'thumbs-up' : '1f44d'
-      });
-
       return {
-        emojiConv: emoji,
+        emojiConv: this.$emoji,
         slackmojis: { },
         messages: this.orderedMessageList(),
         inputNick: '',
@@ -340,6 +322,6 @@
     font-weight: 400;
     src: local('Questrial'),
     local('Questrial-Regular'),
-    url("../../assets/fonts/questrial-regular.woff2") format('woff2');
+    url("../../../../public/assets/fonts/questrial-regular.woff2") format('woff2');
   }
 </style>

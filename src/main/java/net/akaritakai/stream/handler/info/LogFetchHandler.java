@@ -21,7 +21,7 @@ public class LogFetchHandler extends AbstractHandler<LogFetchRequest>
 
     public LogFetchHandler(Vertx vertx, CheckAuth checkAuth) {
         super(LogFetchRequest.class, checkAuth);
-        DashboardLogAppender.getOutputStream().addListener(bytes -> vertx.runOnContext(event -> {
+        DashboardLogAppender.getGlobalOutputStream().addListener(bytes -> vertx.runOnContext(event -> {
             acceptLog(bytes);
         }));
     }
@@ -39,13 +39,14 @@ public class LogFetchHandler extends AbstractHandler<LogFetchRequest>
                     .setChunked(true)
                     .putHeader(HttpHeaders.CONTENT_TYPE, "text/plain")
                     .putHeader(HttpHeaders.CACHE_CONTROL, "no-store");
+            response.write("Start\r\n");
             _waitForBytes.thenAccept(new Consumer<byte[]>() {
                 private boolean end;
                 @Override
                 public void accept(byte[] bytes) {
-                    if (httpRequest.isEnded()) {
-                        end = true;
-                    }
+                    //if (httpRequest.isEnded()) {
+                    //    end = true;
+                    //}
                     if (end) {
                         return;
                     }
@@ -53,8 +54,9 @@ public class LogFetchHandler extends AbstractHandler<LogFetchRequest>
                         if (bytes != null && bytes.length > 0) {
                             response.write(Buffer.buffer(bytes)).onFailure(event -> {
                                 end = true;
-                                response.close();
+                                response.end();
                             }).onSuccess(event -> {
+                                //response.send()
                             });
                         }
                         _waitForBytes.thenAccept(this);
@@ -62,7 +64,7 @@ public class LogFetchHandler extends AbstractHandler<LogFetchRequest>
                     } catch (Exception e) {
                         LOG.info("Error", e);
                     }
-                    response.close();
+                    response.end();
                 }
             });
             LOG.info("log listener from {}", httpRequest.remoteAddress());

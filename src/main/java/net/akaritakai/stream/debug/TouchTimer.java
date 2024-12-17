@@ -1,7 +1,6 @@
 package net.akaritakai.stream.debug;
 
 import io.vertx.ext.web.RoutingContext;
-import org.apache.logging.log4j.util.StringBuilderFormattable;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -11,7 +10,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.*;
 
-public class TouchTimer implements StringBuilderFormattable {
+public class TouchTimer {
 
     public static final String KEY = "TouchTimer";
     private static final ThreadLocal<TouchTimer> LOCAL = new ThreadLocal<>();
@@ -122,9 +121,9 @@ public class TouchTimer implements StringBuilderFormattable {
         if (arg instanceof Supplier) {
             arg = ((Supplier<?>) arg).get();
         }
-        if (arg instanceof StringBuilderFormattable) {
+        /*if (arg instanceof StringBuilderFormattable) {
             ((StringBuilderFormattable) arg).formatTo(buffer);
-        } else if (arg instanceof LongSupplier) {
+        } else */if (arg instanceof LongSupplier) {
             buffer.append(((LongSupplier) arg).getAsLong());
         } else if (arg instanceof IntSupplier) {
             buffer.append(((IntSupplier) arg).getAsInt());
@@ -168,7 +167,7 @@ public class TouchTimer implements StringBuilderFormattable {
         sb.append(System.lineSeparator()).append('\t');
     }
 
-    @Override
+    //@Override
     public void formatTo(StringBuilder buffer) {
         Entry e = first;
         final Instant start = getStartInstant();

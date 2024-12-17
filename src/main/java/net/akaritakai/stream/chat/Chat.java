@@ -3,8 +3,6 @@ package net.akaritakai.stream.chat;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.vertx.core.Vertx;
-import io.vertx.ext.web.Router;
-import io.vertx.ext.web.handler.BodyHandler;
 import net.akaritakai.stream.CheckAuth;
 import net.akaritakai.stream.handler.RouterHelper;
 import net.akaritakai.stream.handler.chat.*;
@@ -16,7 +14,6 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.util.Map;
-import java.util.Optional;
 
 public class Chat {
     private final Vertx vertx;

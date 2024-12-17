@@ -30,69 +30,11 @@
 </template>
 
 <script>
-  require("../../../../node_modules/rm-emoji-picker/dist/emojipicker.css");
-  import sheet_apple from "../../../../node_modules/rm-emoji-picker/sheets/sheet_apple_64_indexed_128.png";
-  import sheet_google from "../../../../node_modules/rm-emoji-picker/sheets/sheet_google_64_indexed_128.png";
-  import sheet_twitter from "../../../../node_modules/rm-emoji-picker/sheets/sheet_twitter_64_indexed_128.png";
-
   import Vue from 'vue';
   import {mapState} from "vuex";
-  import EmojiPicker from "../../../../node_modules/rm-emoji-picker/dist/index.js";
-  const picker = new EmojiPicker({
-    sheets: {
-      apple   : sheet_apple,
-      google  : sheet_google,
-      twitter : sheet_twitter
-    },
-    positioning: function(tip) {
-      if (typeof(tip.element_rect) != 'undefined') {
-        let coordinate = {
-          top: tip.centered_coordinate.top - (tip.element_rect.height + tip.tooltip_height) / 2,
-          left: tip.centered_coordinate.left
-        };
-        tip._applyPosition(coordinate)('TooltipAbove');
-      } else {
-        tip.above();
-      }
-    },
-    search_icon : '🔍',
-    categories: [
-      {
-        title: "People",
-        icon : '😀'
-      },
-      {
-        title: "Nature",
-        icon : '🌳'
-      },
-      {
-        title: "Foods",
-        icon : '🍉'
-      },
-      {
-        title: "Activity",
-        icon : '⚽'
-      },
-      {
-        title: "Places",
-        icon : '🧭'
-      },
-      {
-        title: "Symbols",
-        icon : '➗'
-      },
-      {
-        title: "Flags",
-        icon : '🏳'
-      }
-    ]
-  });
 
   export default {
     name: 'chat-input',
-    components: {
-      EmojiPicker
-    },
     data() {
       return {
         message: '',
@@ -122,9 +64,9 @@
         const target = event.target;
         const input = this.$refs.textArea;
         const comp = this.$refs.inputArea;
-        picker.listenOn(target, comp, input);
+        this.$emojipicker.listenOn(target, comp, input);
         let self = this;
-        picker._callback = function(emoji, cat, node) {
+        this.$emojipicker._callback = function(emoji, cat, node) {
           self.message = input.value;
         };
       }
@@ -249,6 +191,6 @@
     font-weight: 400;
     src: local('Questrial'),
     local('Questrial-Regular'),
-    url("../../assets/fonts/questrial-regular.woff2") format('woff2');
+    url("../../../../public/assets/fonts/questrial-regular.woff2") format('woff2');
   }
 </style>

@@ -11,6 +11,7 @@
     "lint": "eslint . --fix"
   },
   "dependencies": {
+    "@femessage/log-viewer": "^1.5.0",
     "axios": "^1.7.9",
     "bootstrap": "^4.6.2",
     "bootstrap-vue": "^2.23.1",
@@ -19,7 +20,6 @@
     "hls.js": "^1.5.17",
     "js-tabs": "^1.0.1",
     "luxon": "^3.5.0",
-    "popper.js": "^1.16.1",
     "rm-emoji-picker": "^1.0.0",
     "simplebar-vue": "^2.4.0",
     "video.js": "^8.21.0",

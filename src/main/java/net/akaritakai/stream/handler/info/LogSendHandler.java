@@ -31,7 +31,7 @@ public class LogSendHandler implements Handler<RoutingContext> {
                 try {
                     LogSendRequest request = OBJECT_MAPPER.readValue(message, LogSendRequest.class);
                     validateLogSendRequest(request);
-                    DashboardLogAppender.getOutputStream().writeBytes(request.getLog().getBytes(StandardCharsets.UTF_8));
+                    DashboardLogAppender.getGlobalOutputStream().writeBytes(request.getLog().getBytes(StandardCharsets.UTF_8));
                 } catch (Exception e) {
                     socket.close((short) 400, "Bad request");
                 }

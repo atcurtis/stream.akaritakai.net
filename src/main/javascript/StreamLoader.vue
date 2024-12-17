@@ -103,7 +103,7 @@
     font-weight: 400;
     src: local('Open Sans Regular'),
     local('OpenSans-Regular'),
-    url("../assets/fonts/open-sans-regular.woff2") format('woff2');
+    url("../../../public/assets/fonts/open-sans-regular.woff2") format('woff2');
   }
 
   @keyframes spin {

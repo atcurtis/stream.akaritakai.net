@@ -1,17 +1,20 @@
 <template>
-  <textarea v-if="!needApiKey" readonly rows="25" class="form-control monospace server-log" v-model="content">
-  </textarea>
+  <log-viewer v-if="!needApiKey" :log="log"/>
 </template>
 
 <script>
   import {mapGetters, mapState} from 'vuex';
   import axios from 'axios';
+  import LogViewer from '@femessage/log-viewer'
 
   export default {
     name: 'server-log',
+    components: {
+      'log-viewer': LogViewer
+    },
     data () {
       return {
-        content: ''
+        log: ''
       };
     },
     computed: {
@@ -43,7 +46,7 @@
 
           function appendChunks(result) {
             var chunk = decoder.decode(result.value || Uint8Array, { stream: !result.done});
-            view.content += chunk;
+            view.log += chunk;
             if (result.done) {
               return "";
             } else {

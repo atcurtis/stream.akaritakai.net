@@ -187,6 +187,6 @@
     font-weight: 400;
     src: local('Questrial'),
     local('Questrial-Regular'),
-    url("../../assets/fonts/questrial-regular.woff2") format('woff2');
+    url("../../../../public/assets/fonts/questrial-regular.woff2") format('woff2');
   }
 </style>

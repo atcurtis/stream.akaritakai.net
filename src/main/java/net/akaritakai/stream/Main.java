@@ -1,5 +1,10 @@
 package net.akaritakai.stream;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.ConsoleAppender;
 import io.vertx.core.CompositeFuture;
 import io.vertx.core.Handler;
 import io.vertx.core.Promise;
@@ -29,6 +34,7 @@ import net.akaritakai.stream.handler.stream.StopCommandHandler;
 import net.akaritakai.stream.handler.stream.StreamStatusHandler;
 import net.akaritakai.stream.handler.telemetry.TelemetryFetchHandler;
 import net.akaritakai.stream.handler.telemetry.TelemetrySendHandler;
+import net.akaritakai.stream.log.DashboardLogAppender;
 import net.akaritakai.stream.scheduling.SetupScheduler;
 import net.akaritakai.stream.scheduling.Utils;
 import net.akaritakai.stream.streamer.Streamer;
@@ -38,10 +44,10 @@ import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import net.sourceforge.argparse4j.inf.Namespace;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
@@ -59,7 +65,7 @@ import java.util.concurrent.TimeUnit;
 
 
 public class Main {
-    private static final Logger LOG = LogManager.getLogger(Main.class);
+    private static final Logger LOG = LoggerFactory.getLogger(Main.class);
 
     private RouterHelper router;
     private boolean sslApi;
@@ -69,6 +75,36 @@ public class Main {
 
 
     private Main() {
+        LoggerContext logCtx = (LoggerContext) LoggerFactory.getILoggerFactory();
+
+        PatternLayoutEncoder logEncoder = new PatternLayoutEncoder();
+        logEncoder.setContext(logCtx);
+        logEncoder.setPattern("%-12date{YYYY-MM-dd HH:mm:ss.SSS} %-5level - %msg%n");
+        logEncoder.start();
+
+        ConsoleAppender<ILoggingEvent> logConsoleAppender = new ConsoleAppender<>();
+        logConsoleAppender.setContext(logCtx);
+        logConsoleAppender.setName("console");
+        logConsoleAppender.setEncoder(logEncoder);
+        logConsoleAppender.start();
+
+        logEncoder = new PatternLayoutEncoder();
+        logEncoder.setContext(logCtx);
+        logEncoder.setPattern("%-12date{YYYY-MM-dd HH:mm:ss.SSS} %-5level - %msg%n");
+        logEncoder.start();
+
+        DashboardLogAppender<ILoggingEvent> dashboardLogAppender = new DashboardLogAppender<>();
+        dashboardLogAppender.setContext(logCtx);
+        dashboardLogAppender.setName("dashboard");
+        dashboardLogAppender.setEncoder(logEncoder);
+        dashboardLogAppender.setImmediateFlush(true);
+        dashboardLogAppender.start();
+
+        ch.qos.logback.classic.Logger log = logCtx.getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME);
+        log.setAdditive(true);
+        log.setLevel(Level.INFO);
+        //log.addAppender(logConsoleAppender);
+        log.addAppender(dashboardLogAppender);
     }
 
     private Namespace handleArguments(String[] args) {
