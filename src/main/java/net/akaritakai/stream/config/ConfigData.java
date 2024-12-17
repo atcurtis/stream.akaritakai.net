@@ -14,8 +14,10 @@ public class ConfigData {
   String apiKey;
   String livePlaylistUrl;
   int port;
+  int sslPort;
 
   // Production mode S3 client settings (where to fetch metadata/media)
+  boolean awsDirectory;
   String awsRegion;
   String awsAccessKey;
   String awsSecretKey;

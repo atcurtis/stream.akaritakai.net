@@ -56,7 +56,7 @@ public class Streamer extends NotificationBroadcasterSupport implements Streamer
   public Streamer(Vertx vertx, ConfigData config, Scheduler scheduler) {
     _vertx = vertx;
     _scheduler = scheduler;
-    if (config.isDevelopment()) {
+    if (config.isDevelopment() || !config.isAwsDirectory()) {
       _client = new FakeAwsS3Client(vertx, config);
     } else {
       _client = new AwsS3Client(vertx, config);
