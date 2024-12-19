@@ -5,12 +5,12 @@
 
 version: 2
 updates:
-  - package-ecosystem: "gradle"
-    directory: "/server"
+  - package-ecosystem: "maven"
+    directory: "/"
     schedule:
       interval: "weekly"
 
- - package-ecosystem: "Yarn"
-    directory: "/view"
+ - package-ecosystem: "npm"
+    directory: "/"
     schedule:
       interval: "weekly"
