@@ -10,6 +10,7 @@
     <!--packaging>pom</packaging-->
 
     <properties>
+        <mainClass>net.akaritakai.stream.Main</mainClass>
         <maven.compiler.source>11</maven.compiler.source>
         <maven.compiler.target>11</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -204,7 +205,7 @@
                     <archive>
                         <manifest>
                             <addClasspath>true</addClasspath>
-                            <mainClass>net.akaritakai.stream.Main</mainClass>
+                            <mainClass>${mainClass}</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
@@ -212,15 +213,36 @@
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>appassembler-maven-plugin</artifactId>
-                <version>1.10</version>
-                <configuration>
-                    <programs>
-                        <program>
-                            <mainClass>net.akaritakai.stream.Main</mainClass>
-                            <id>app</id>
-                        </program>
-                    </programs>
-                </configuration>
+                <version>2.1.0</version>
+                <executions>
+                    <execution>
+                        <goals><goal>assemble</goal></goals>
+                        <phase>package</phase>
+                        <configuration>
+                            <extraJvmArguments></extraJvmArguments>
+                            <programs>
+                                <program>
+                                    <mainClass>${mainClass}</mainClass>
+                                    <id>${project.name}</id>
+                                </program>
+                            </programs>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>3.4.2</version>
+                <executions>
+                    <execution>
+                        <goals><goal>single</goal></goals>
+                        <phase>package</phase>
+                        <configuration>
+                            <descriptors><descriptor>src/main/assembly/assembly.xml</descriptor></descriptors>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
         <resources>
