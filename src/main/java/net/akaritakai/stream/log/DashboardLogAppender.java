@@ -18,7 +18,6 @@ public class DashboardLogAppender<E> extends OutputStreamAppender<E> {
     private boolean _immediateFlush = true;
 
     public DashboardLogAppender() {
-        setOutputStream(getGlobalOutputStream());
     }
 
     /**
