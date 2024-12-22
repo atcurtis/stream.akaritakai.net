@@ -5,7 +5,7 @@ import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.ConsoleAppender;
-import io.vertx.core.CompositeFuture;
+import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
@@ -41,6 +41,9 @@ import net.akaritakai.stream.streamer.Streamer;
 import net.akaritakai.stream.streamer.StreamerMBean;
 import net.akaritakai.stream.telemetry.TelemetryStore;
 import net.sourceforge.argparse4j.ArgumentParsers;
+import net.sourceforge.argparse4j.DefaultSettings;
+import net.sourceforge.argparse4j.helper.HelpScreenException;
+import net.sourceforge.argparse4j.impl.Arguments;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import net.sourceforge.argparse4j.inf.Namespace;
@@ -58,15 +61,21 @@ import java.lang.management.ManagementFactory;
 import java.net.MalformedURLException;
 import java.nio.channels.ClosedChannelException;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 
 public class Main {
-    private static final Logger LOG = LoggerFactory.getLogger(Main.class);
 
+    private static final Logger LOG;
+    static {
+        File cfg = new File("logback.xml");
+        if (cfg.exists() && System.getProperty("logback.configurationFile") == null) {
+            System.setProperty("logback.configurationFile", cfg.getAbsolutePath());
+        }
+        LOG = LoggerFactory.getLogger(Main.class);
+    }
+
+    private final String version = getClass().getPackage().getImplementationVersion();
     private RouterHelper router;
     private boolean sslApi;
     private boolean sslMedia;
@@ -98,6 +107,7 @@ public class Main {
         dashboardLogAppender.setName("dashboard");
         dashboardLogAppender.setEncoder(logEncoder);
         dashboardLogAppender.setImmediateFlush(true);
+        dashboardLogAppender.setOutputStream(DashboardLogAppender.getGlobalOutputStream());
         dashboardLogAppender.start();
 
         ch.qos.logback.classic.Logger log = logCtx.getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME);
@@ -108,9 +118,17 @@ public class Main {
     }
 
     private Namespace handleArguments(String[] args) {
-        ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("StreamServer")
+        ArgumentParser argumentParser = ArgumentParsers.newFor("StreamServer")
+                .addHelp(true)
+                .terminalWidthDetection(true)
+                .singleMetavar(true)
+                .build()
                 .defaultHelp(true)
-                .description("A basic video sharing and streaming service");
+                .description("A basic video sharing and streaming service")
+                .version(version);
+        argumentParser.addArgument("--version")
+                .help("Print build version")
+                .action(Arguments.version());
         argumentParser.addArgument("-f", "--configFile")
                 .dest("configFile")
                 .help("Configuration file")
@@ -147,7 +165,7 @@ public class Main {
             return argumentParser.parseArgs(args);
         } catch (ArgumentParserException e) {
             argumentParser.handleError(e);
-            System.exit(1);
+            System.exit(e instanceof HelpScreenException ? 0 : 1);
             return null;
         }
     }
@@ -210,13 +228,13 @@ public class Main {
             });
         });
         try {
-            main.main(startTimer, ns, shutdown, shutdownActions);
+            main.main0(startTimer, ns, shutdown, shutdownActions);
         } catch (Exception ex) {
             shutdown.completeExceptionally(ex);
         }
     }
 
-    private void main(TouchTimer startTimer, Namespace ns,
+    private void main0(TouchTimer startTimer, Namespace ns,
                       CompletableFuture<Void> shutdown, Stack<ShutdownAction> shutdownActions) throws Exception {
 
         sslApi = Optional.ofNullable(ns.getBoolean("sslApi")).orElse(false);
@@ -249,7 +267,7 @@ public class Main {
         Vertx vertx = Vertx.vertx().exceptionHandler(ex -> {
             LOG.error("Exception", ex);
         });
-        shutdownExecutor = task -> vertx.executeBlocking(event -> task.run());
+        shutdownExecutor = task -> vertx.executeBlocking(Executors.callable(task));
         shutdownActions.add(() -> vertx.close().toCompletionStage().toCompletableFuture().join());
 
         router = new RouterHelper(vertx, sslApi);
@@ -380,6 +398,7 @@ public class Main {
 
         ssc.ifPresent(selfSignedCertificate -> {
             httpsServerOptions.setSsl(true);
+            //noinspection deprecation
             httpsServerOptions.setPemKeyCertOptions(selfSignedCertificate.keyCertOptions());
             httpsServerOptions.setTrustOptions(selfSignedCertificate.trustOptions());
         });
@@ -418,7 +437,7 @@ public class Main {
                 });
         shutdownActions.add(() -> httpsServer.close().toCompletionStage().toCompletableFuture().join());
 
-        CompositeFuture.all(startHttp.future(), startHttps.future())
+        Future.all(startHttp.future(), startHttps.future())
                 .onSuccess(event -> {
                     startTimer.touch("Ports bound");
                     try {
