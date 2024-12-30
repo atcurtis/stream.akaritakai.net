@@ -16,7 +16,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <lombok.version>1.18.30</lombok.version>
         <vertx.version>4.5.11</vertx.version>
-        <graalvm.version>22.2.0</graalvm.version>
+        <graalvm.version>24.1.1</graalvm.version>
     </properties>
 
     <dependencies>
