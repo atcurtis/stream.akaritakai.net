@@ -39,7 +39,7 @@ public class AwsS3Client {
   }
 
   private static AmazonS3 buildAwsClient(ConfigData config) {
-    if (config.isDevelopment()) {
+    if (config.isDevelopment() || !config.isAwsDirectory()) {
       return null; // We won't build the S3 client for dev usage
     }
     AWSCredentials credentials = new BasicAWSCredentials(config.getAwsAccessKey(), config.getAwsSecretKey());
