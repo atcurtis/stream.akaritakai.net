@@ -348,7 +348,7 @@ public class Main {
         }
 
         Optional.of(new StaticResourceHandler(vertx.getOrCreateContext())
-                        .setWebRoot("/webroot")
+                        .setWebRoot(config.getWebRootDir())
                         .setCachingEnabled(true)
                         .setCacheEntryTimeout(TimeUnit.HOURS.toMillis(2))
                         .setMaxAgeSeconds(TimeUnit.HOURS.toSeconds(2))
