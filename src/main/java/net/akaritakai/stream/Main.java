@@ -403,10 +403,14 @@ public class Main {
             httpsServerOptions.setTrustOptions(selfSignedCertificate.trustOptions());
         });
 
+        String bind = Optional.ofNullable(config.getBind())
+                .filter(value -> !value.isBlank())
+                .orElse("0.0.0.0");
+
         startTimer.touch("createHttpServer");
         HttpServer httpServer = vertx.createHttpServer(httpServerOptions)
                 .requestHandler(router.router)
-                .listen(Optional.ofNullable(ns.getInt("port")).orElse(config.getPort()), event -> {
+                .listen(Optional.ofNullable(ns.getInt("port")).orElse(config.getPort()), bind, event -> {
                     if (event.succeeded()) {
                         startTimer.touch("http:listen done, port {}", event.result().actualPort());
                         LOG.info("Started the http server on port {}", event.result().actualPort());
@@ -423,7 +427,7 @@ public class Main {
         startTimer.touch("createHttpsServer");
         HttpServer httpsServer = vertx.createHttpServer(httpsServerOptions)
                 .requestHandler(router.sslRouter)
-                .listen(Optional.ofNullable(ns.getInt("sslPort")).orElse(config.getSslPort()), event -> {
+                .listen(Optional.ofNullable(ns.getInt("sslPort")).orElse(config.getSslPort()), bind, event -> {
                     if (event.succeeded()) {
                         startTimer.touch("https:listen done, port {}", event.result().actualPort());
                         LOG.info("Started the https server on port {}", event.result().actualPort());
