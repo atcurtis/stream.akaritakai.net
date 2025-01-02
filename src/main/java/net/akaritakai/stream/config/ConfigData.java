@@ -15,6 +15,7 @@ public class ConfigData {
   String livePlaylistUrl;
   int port;
   int sslPort;
+  String bind;
 
   // Production mode S3 client settings (where to fetch metadata/media)
   boolean awsDirectory;
