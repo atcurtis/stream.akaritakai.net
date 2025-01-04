@@ -4,26 +4,22 @@ import io.vertx.core.Vertx;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.http.HttpServerResponse;
 import net.akaritakai.stream.CheckAuth;
+import net.akaritakai.stream.handler.AbstractBlockingHandler;
 import net.akaritakai.stream.handler.AbstractHandler;
 import net.akaritakai.stream.models.stream.request.StreamPauseRequest;
 import net.akaritakai.stream.scheduling.Utils;
 import net.akaritakai.stream.streamer.StreamerMBean;
 import org.apache.commons.lang3.Validate;
 
-import javax.management.ObjectName;
-import java.util.concurrent.CompletableFuture;
+import static net.akaritakai.stream.config.GlobalNames.streamerName;
 
 /**
  * Handles the "POST /stream/pause" command.
  */
-public class PauseCommandHandler extends AbstractHandler<StreamPauseRequest> {
-  private final Vertx _vertx;
-  private final StreamerMBean _streamer;
+public class PauseCommandHandler extends AbstractBlockingHandler<StreamPauseRequest> {
 
-  public PauseCommandHandler(ObjectName streamer, CheckAuth checkAuth, Vertx vertx) {
-    super(StreamPauseRequest.class, checkAuth);
-    _streamer = Utils.beanProxy(streamer, StreamerMBean.class);
-    _vertx = vertx;
+  public PauseCommandHandler(CheckAuth checkAuth, Vertx vertx) {
+    super(StreamPauseRequest.class, vertx, checkAuth);
   }
 
   protected void validateRequest(StreamPauseRequest request) {
@@ -32,19 +28,14 @@ public class PauseCommandHandler extends AbstractHandler<StreamPauseRequest> {
   }
 
   protected void handleAuthorized(HttpServerRequest httpRequest, StreamPauseRequest request, HttpServerResponse response) {
-    CompletableFuture
-            .completedStage(request)
-            .thenApplyAsync(Utils::writeAsString)
-            .thenAcceptAsync(_streamer::pauseStream)
-            .whenComplete(((unused, ex) -> {
-              _vertx.runOnContext(event -> {
-                if (ex == null) {
-                  handleSuccess(response);
-                } else {
-                  handleFailure(response, ex);
-                }
-              });
-            }));
+    executeBlocking(() -> {
+      assert request != null;
+      Utils.beanProxy(streamerName, StreamerMBean.class)
+              .pauseStream();
+      return null;
+    })
+            .onSuccess(unused -> handleSuccess(response))
+            .onFailure(ex -> handleFailure(response, ex));
   }
 
   private void handleFailure(HttpServerResponse response, Throwable t) {

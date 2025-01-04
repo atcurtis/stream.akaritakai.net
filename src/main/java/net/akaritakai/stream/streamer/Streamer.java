@@ -2,10 +2,7 @@ package net.akaritakai.stream.streamer;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -18,27 +15,31 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
+import net.akaritakai.stream.CheckAuth;
 import net.akaritakai.stream.client.AwsS3Client;
 import net.akaritakai.stream.client.FakeAwsS3Client;
 import net.akaritakai.stream.config.ConfigData;
 import net.akaritakai.stream.exception.StreamStateConflictException;
+import net.akaritakai.stream.handler.RouterHelper;
+import net.akaritakai.stream.handler.stream.*;
 import net.akaritakai.stream.models.stream.StreamEntry;
 import net.akaritakai.stream.models.stream.StreamMetadata;
 import net.akaritakai.stream.models.stream.StreamState;
 import net.akaritakai.stream.models.stream.StreamStateType;
-import net.akaritakai.stream.models.stream.request.StreamPauseRequest;
 import net.akaritakai.stream.models.stream.request.StreamResumeRequest;
 import net.akaritakai.stream.models.stream.request.StreamStartRequest;
-import net.akaritakai.stream.models.stream.request.StreamStopRequest;
+import net.akaritakai.stream.scheduling.ScheduleManagerMBean;
 import net.akaritakai.stream.scheduling.Utils;
-import org.quartz.JobDataMap;
-import org.quartz.Scheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import javax.management.AttributeChangeNotification;
 import javax.management.Notification;
 import javax.management.NotificationBroadcasterSupport;
+import javax.management.ObjectName;
+
+import static net.akaritakai.stream.config.GlobalNames.scheduleManagerName;
 
 
 public class Streamer extends NotificationBroadcasterSupport implements StreamerMBean {
@@ -50,12 +51,10 @@ public class Streamer extends NotificationBroadcasterSupport implements Streamer
   private final String _livePlaylistUrl;
   private final AtomicReference<StreamState> _state = new AtomicReference<>(StreamState.OFFLINE);
 
-  private final Scheduler _scheduler;
   private final AtomicInteger _sequenceNumber = new AtomicInteger();
 
-  public Streamer(Vertx vertx, ConfigData config, Scheduler scheduler) {
+  public Streamer(Vertx vertx, ConfigData config) {
     _vertx = vertx;
-    _scheduler = scheduler;
     if (config.isDevelopment() || !config.isAwsDirectory()) {
       _client = new FakeAwsS3Client(vertx, config);
     } else {
@@ -63,6 +62,16 @@ public class Streamer extends NotificationBroadcasterSupport implements Streamer
     }
     _livePlaylistUrl = config.getLivePlaylistUrl();
   }
+
+  public static void register(Vertx vertx, RouterHelper router, CheckAuth auth, ObjectName streamerName) {
+    router.registerGetHandler("/stream/status", new StreamStatusHandler(vertx));
+    router.registerPostApiHandler("/stream/start", new StartCommandHandler(auth, vertx));
+    router.registerPostApiHandler("/stream/stop", new StopCommandHandler(auth, vertx));
+    router.registerPostApiHandler("/stream/pause", new PauseCommandHandler(auth, vertx));
+    router.registerPostApiHandler("/stream/resume", new ResumeCommandHandler(auth, vertx));
+    router.registerPostApiHandler("/stream/dir", new DirCommandHandler(auth, vertx));
+  }
+
 
   static StreamState.StreamStateBuilder builder(StreamState state) {
     return StreamState.builder()
@@ -77,15 +86,7 @@ public class Streamer extends NotificationBroadcasterSupport implements Streamer
   }
 
   @Override
-  public void startStream(String request) {
-    try {
-      startStream(objectMapper.readValue(request, StreamStartRequest.class));
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  public void startStream(StreamStartRequest request) {
+  public void startStream(@Nonnull StreamStartRequest request) {
     LOG.info("Got request to start the stream: {}", request);
     // Ensure that the stream is not already running
     StreamState state = _state.get();
@@ -130,16 +131,9 @@ public class Streamer extends NotificationBroadcasterSupport implements Streamer
     setState(newState);
   }
 
-  public void pauseStream(String request) {
-    try {
-      pauseStream(objectMapper.readValue(request, StreamPauseRequest.class));
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  public void pauseStream(StreamPauseRequest request) {
-    LOG.info("Got request to pause the stream: {}", request);
+  @Override
+  public void pauseStream() {
+    LOG.info("Got request to pause the stream");
     // Ensure that the stream is already running
     StreamState state = _state.get();
     if (state == null || state.getStatus() != StreamStateType.ONLINE) {
@@ -170,15 +164,7 @@ public class Streamer extends NotificationBroadcasterSupport implements Streamer
   }
 
   @Override
-  public void resumeStream(String request) {
-    try {
-      resumeStream(objectMapper.readValue(request, StreamResumeRequest.class));
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  public void resumeStream(StreamResumeRequest request) {
+  public void resumeStream(@Nonnull StreamResumeRequest request) {
     LOG.info("Got request to resume the stream: {}", request);
     // Ensure that the stream is paused
     StreamState state = _state.get();
@@ -213,16 +199,8 @@ public class Streamer extends NotificationBroadcasterSupport implements Streamer
   }
 
   @Override
-  public void stopStream(String request) {
-    try {
-      stopStream(objectMapper.readValue(request, StreamStopRequest.class));
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  public void stopStream(StreamStopRequest request) {
-    LOG.info("Got request to stop the stream: {}", request);
+  public void stopStream() {
+    LOG.info("Got request to stop the stream");
     // Ensure that the stream is not already stopped
     StreamState state = _state.get();
     if (state == null || state.getStatus() == StreamStateType.OFFLINE) {
@@ -265,16 +243,17 @@ public class Streamer extends NotificationBroadcasterSupport implements Streamer
       Notification n = new AttributeChangeNotification(this, _sequenceNumber.getAndIncrement(), System.currentTimeMillis(), "StreamState", "StreamState", StreamState.class.getName(), old, state);
       sendNotification(n);
 
-      JobDataMap jobDataMap = new JobDataMap();
-      jobDataMap.put("status", state.getStatus());
-      jobDataMap.put("live", state.isLive());
+      Map<String, String> jobDataMap = new HashMap<>();
+      jobDataMap.put("status", Optional.ofNullable(state.getStatus()).map(Objects::toString).orElse(null));
+      jobDataMap.put("live", String.valueOf(state.isLive()));
       jobDataMap.put("playlist", state.getPlaylist());
       jobDataMap.put("mediaName", state.getMediaName());
-      jobDataMap.put("mediaDuration", state.getMediaDuration());
-      jobDataMap.put("startTime", state.getStartTime());
-      jobDataMap.put("endTime", state.getEndTime());
-      jobDataMap.put("seekTime", state.getSeekTime());
-      Utils.triggerIfExists(_scheduler, "Stream", String.valueOf(state), jobDataMap);
+      jobDataMap.put("mediaDuration", Optional.ofNullable(state.getMediaDuration()).map(Duration::toString).orElse(null));
+      jobDataMap.put("startTime", Optional.ofNullable(state.getStartTime()).map(Instant::toString).orElse(null));
+      jobDataMap.put("endTime", Optional.ofNullable(state.getEndTime()).map(Instant::toString).orElse(null));
+      jobDataMap.put("seekTime", Optional.ofNullable(state.getSeekTime()).map(Duration::toString).orElse(null));
+      Utils.beanProxy(scheduleManagerName, ScheduleManagerMBean.class)
+              .triggerIfExists( "Stream", String.valueOf(state), jobDataMap);
     }
   }
 

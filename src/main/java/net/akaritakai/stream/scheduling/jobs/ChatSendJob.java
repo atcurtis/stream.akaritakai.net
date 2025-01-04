@@ -16,6 +16,6 @@ public class ChatSendJob extends AbstractChatJob {
                 .message(context.get("message").toString())
                 .source(Util.ANY)
                 .build();
-        chatManager.sendMessage(writeValueAsString(request));
+        chatManager.sendMessage(request);
     }
 }

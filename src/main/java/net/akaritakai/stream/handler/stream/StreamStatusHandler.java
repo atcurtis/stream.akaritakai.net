@@ -15,8 +15,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.management.AttributeChangeNotification;
-import javax.management.ObjectName;
 
+import static net.akaritakai.stream.config.GlobalNames.*;
 
 /**
  * Handles websocket requests to "/stream/status"
@@ -29,9 +29,9 @@ public class StreamStatusHandler implements Handler<RoutingContext> {
   private final StreamerMBean _stream;
   private final Set<ServerWebSocket> _sockets = ConcurrentHashMap.newKeySet();
 
-  public StreamStatusHandler(Vertx vertx, ObjectName stream) {
+  public StreamStatusHandler(Vertx vertx) {
     _vertx = vertx;
-    _stream = Utils.beanProxy(stream, StreamerMBean.class);
+    _stream = Utils.beanProxy(streamerName, StreamerMBean.class);
     _stream.addNotificationListener((notification, handback) -> {
       assert this == handback;
       StreamState streamState;

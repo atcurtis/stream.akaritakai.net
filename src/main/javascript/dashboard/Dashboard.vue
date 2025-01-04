@@ -46,6 +46,9 @@
               </b-tab>
             </b-tabs>
           </b-tab>
+          <b-tab title="Script">
+            <scripting/>
+          </b-tab>
           <b-tab title="Server Log">
             <server-log v-on:showResult="showResult"/>
           </b-tab>
@@ -95,6 +98,11 @@
     /* webpackPrefetch: true */
     './EmojiTool.vue');
 
+  const Scripting = () => import(
+    /* webpackChunkName: "serverLog" */
+    /* webpackPrefetch: true */
+    './Scripting.vue');
+
   const ServerLog = () => import(
     /* webpackChunkName: "serverLog" */
     /* webpackPrefetch: true */
@@ -111,6 +119,7 @@
       StreamViewers,
       ChatLog,
       EmojiTool,
+      Scripting,
       ServerLog
     },
     data() {

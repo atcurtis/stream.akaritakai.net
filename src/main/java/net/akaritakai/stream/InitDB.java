@@ -1,5 +1,7 @@
 package net.akaritakai.stream;
 
+import net.akaritakai.stream.config.GlobalNames;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
@@ -7,7 +9,7 @@ import java.sql.Statement;
 public class InitDB {
     public static void main(String[] args) throws Exception{
         // create a database connection
-        Connection connection = DriverManager.getConnection("jdbc:sqlite:scheduler.db");
+        Connection connection = DriverManager.getConnection(GlobalNames.JDBC_URL);
         Statement statement = connection.createStatement();
         statement.setQueryTimeout(30);  // set timeout to 30 sec.
 

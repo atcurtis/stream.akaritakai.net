@@ -1,20 +1,21 @@
 package net.akaritakai.stream.handler.quartz;
 
+import io.vertx.core.Vertx;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.http.HttpServerResponse;
 import net.akaritakai.stream.CheckAuth;
-import net.akaritakai.stream.handler.AbstractHandler;
+import net.akaritakai.stream.handler.AbstractBlockingHandler;
 import net.akaritakai.stream.models.quartz.request.PauseAllRequest;
+import net.akaritakai.stream.scheduling.ScheduleManagerMBean;
+import net.akaritakai.stream.scheduling.Utils;
 import org.apache.commons.lang3.Validate;
-import org.quartz.Scheduler;
 
-public class PauseAllHandler extends AbstractHandler<PauseAllRequest> {
+import static net.akaritakai.stream.config.GlobalNames.scheduleManagerName;
 
-    private final Scheduler _scheduler;
+public class PauseAllHandler extends AbstractBlockingHandler<PauseAllRequest> {
 
-    public PauseAllHandler(Scheduler scheduler, CheckAuth checkAuth) {
-        super(PauseAllRequest.class, checkAuth);
-        _scheduler = scheduler;
+    public PauseAllHandler(Vertx vertx, CheckAuth checkAuth) {
+        super(PauseAllRequest.class, vertx, checkAuth);
     }
 
     @Override
@@ -24,12 +25,12 @@ public class PauseAllHandler extends AbstractHandler<PauseAllRequest> {
 
     @Override
     protected void handleAuthorized(HttpServerRequest httpRequest, PauseAllRequest listJobsRequest, HttpServerResponse response) {
-        try {
-            _scheduler.pauseAll();
-           handleSuccess("OK", "text/plain", response);
-            } catch (Exception e) {
-            handleFailure("Error exiting standby", response, e);
-        }
+        executeBlocking(() -> {
+            Utils.beanProxy(scheduleManagerName, ScheduleManagerMBean.class).pauseAll();
+            return null;
+        })
+                .onSuccess(unused -> handleSuccess("OK", "text/plain", response))
+                .onFailure(ex -> handleFailure("Error exiting standby", response, ex));
     }
 
 }

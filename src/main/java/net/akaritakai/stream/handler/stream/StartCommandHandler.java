@@ -6,26 +6,22 @@ import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.http.HttpServerResponse;
 import net.akaritakai.stream.CheckAuth;
 import net.akaritakai.stream.exception.StreamStateConflictException;
+import net.akaritakai.stream.handler.AbstractBlockingHandler;
 import net.akaritakai.stream.handler.AbstractHandler;
 import net.akaritakai.stream.models.stream.request.StreamStartRequest;
 import net.akaritakai.stream.scheduling.Utils;
 import net.akaritakai.stream.streamer.StreamerMBean;
 import org.apache.commons.lang3.Validate;
 
-import javax.management.ObjectName;
-import java.util.concurrent.CompletableFuture;
+import static net.akaritakai.stream.config.GlobalNames.*;
 
 /**
  * Handles the "POST /stream/start" command.
  */
-public class StartCommandHandler extends AbstractHandler<StreamStartRequest> {
-  private final Vertx _vertx;
-  private final StreamerMBean _streamer;
+public class StartCommandHandler extends AbstractBlockingHandler<StreamStartRequest> {
 
-  public StartCommandHandler(ObjectName streamer, CheckAuth authCheck, Vertx vertx) {
-    super(StreamStartRequest.class, authCheck);
-    _streamer = Utils.beanProxy(streamer, StreamerMBean.class);
-    _vertx = vertx;
+  public StartCommandHandler(CheckAuth authCheck, Vertx vertx) {
+    super(StreamStartRequest.class, vertx, authCheck);
   }
 
   protected void validateRequest(StreamStartRequest request) {
@@ -39,21 +35,19 @@ public class StartCommandHandler extends AbstractHandler<StreamStartRequest> {
   }
 
   protected void handleAuthorized(HttpServerRequest httpRequest, StreamStartRequest request, HttpServerResponse response) {
-    CompletableFuture
-            .completedStage(request)
-            .thenApplyAsync(Utils::writeAsString)
-            .thenAcceptAsync(_streamer::startStream)
-            .thenRun(() -> _vertx.runOnContext(event -> handleSuccess(response)))
-            .exceptionally(ex -> {
-              _vertx.runOnContext(event -> {
-                if (ex instanceof StreamStateConflictException) {
-                  handleStreamAlreadyRunning(response);
-                } else {
-                  handleStreamCannotBeLoaded(response, ex);
-                }
-              });
-              return null;
-            });
+    executeBlocking(() -> {
+      Utils.beanProxy(streamerName, StreamerMBean.class)
+              .startStream(request);
+      return null;
+    })
+            .onSuccess(aVoid -> handleSuccess(response))
+            .onFailure(ex -> {
+                      if (ex instanceof StreamStateConflictException) {
+                        handleStreamAlreadyRunning(response);
+                      } else {
+                        handleStreamCannotBeLoaded(response, ex);
+                      }
+                    });
   }
 
   private void handleStreamAlreadyRunning(HttpServerResponse response) {

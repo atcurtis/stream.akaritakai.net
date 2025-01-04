@@ -38,12 +38,12 @@ public class ChatWriteHandler extends AbstractHandler<ChatWriteRequest> {
 
   protected void handleAuthorized(HttpServerRequest httpRequest, ChatWriteRequest request, HttpServerResponse response) {
     try {
-      _chat.sendMessage(OBJECT_MAPPER.writeValueAsString(ChatSendRequest.builder()
+      _chat.sendMessage(ChatSendRequest.builder()
               .messageType(request.getMessageType())
               .nickname(request.getNickname())
               .message(request.getMessage())
               .source(Util.getIpAddressFromRequest(httpRequest))
-              .build()));
+              .build());
       handleSuccess(response);
     } catch (Exception ex) {
       handleFailure(response, ex);
