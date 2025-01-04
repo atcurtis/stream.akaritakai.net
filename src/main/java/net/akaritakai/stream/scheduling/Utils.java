@@ -11,6 +11,8 @@ import javax.management.JMX;
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
 import java.lang.management.ManagementFactory;
+import java.time.Instant;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.WeakHashMap;
@@ -134,5 +136,7 @@ public class Utils {
         return jobDataMap;
     }
 
-
+    public static Instant toInstant(Date date) {
+        return date != null ? date.toInstant() : null;
+    }
 }

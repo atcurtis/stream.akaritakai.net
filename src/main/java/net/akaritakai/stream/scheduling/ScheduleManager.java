@@ -1,7 +1,5 @@
 package net.akaritakai.stream.scheduling;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.vertx.core.Vertx;
 import net.akaritakai.stream.CheckAuth;
 import net.akaritakai.stream.InitDB;
@@ -31,7 +29,6 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -77,7 +74,9 @@ public class ScheduleManager extends NotificationBroadcasterSupport implements S
         return schedulerFactory;
     }
 
-    public static void setup(Scheduler scheduler) throws SchedulerException {
+    public void setup() throws SchedulerException {
+        Scheduler scheduler = scheduler();
+
         if (!scheduler.checkExists(JobKey.jobKey("ChatEnable"))) {
             scheduler.addJob(JobBuilder.newJob(ChatEnableJob.class).withIdentity("ChatEnable").storeDurably().build(), false);
         }
@@ -201,10 +200,6 @@ public class ScheduleManager extends NotificationBroadcasterSupport implements S
                 : GroupMatcher.triggerGroupStartsWith(groupPrefix))
                 .stream().map(Utils::keyEntry)
                 .collect(Collectors.toSet());
-    }
-
-    private Instant toInstant(Date date) {
-        return date != null ? date.toInstant() : null;
     }
 
     @Override

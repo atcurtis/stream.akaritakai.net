@@ -300,14 +300,14 @@ public class Main {
             }).ifPresent(router::handler);
         }
 
-        registerGetHandler("/health", new HealthCheckHandler());
-        registerGetHandler("/time", new TimeHandler());
-
         registerPostApiHandler("/telemetry/fetch", new TelemetryFetchHandler(telemetryStore, auth));
         registerGetHandler("/telemetry", new TelemetrySendHandler(telemetryStore));
 
         registerPostApiHandler("/log/fetch", new LogFetchHandler(vertx, auth));
         registerGetHandler("/log", new LogSendHandler());
+
+        registerGetHandler("/health", new HealthCheckHandler());
+        registerGetHandler("/time", new TimeHandler());
 
         Streamer.register(vertx, router, auth, streamerName);
         ChatManager.register(vertx, router, auth, chatManagerName);
@@ -363,7 +363,7 @@ public class Main {
 
 
         startTimer.touch("SetupScheduler");
-        ScheduleManager.setup(scheduleManager.scheduler());
+        scheduleManager.setup();
 
         Promise<Void> startHttp = Promise.promise();
         Promise<Void> startHttps = Promise.promise();
