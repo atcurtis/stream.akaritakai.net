@@ -2,10 +2,7 @@ package net.akaritakai.stream.streamer;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -33,7 +30,6 @@ import net.akaritakai.stream.models.stream.request.StreamResumeRequest;
 import net.akaritakai.stream.models.stream.request.StreamStartRequest;
 import net.akaritakai.stream.scheduling.ScheduleManagerMBean;
 import net.akaritakai.stream.scheduling.Utils;
-import org.quartz.JobDataMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -247,15 +243,15 @@ public class Streamer extends NotificationBroadcasterSupport implements Streamer
       Notification n = new AttributeChangeNotification(this, _sequenceNumber.getAndIncrement(), System.currentTimeMillis(), "StreamState", "StreamState", StreamState.class.getName(), old, state);
       sendNotification(n);
 
-      JobDataMap jobDataMap = new JobDataMap();
-      jobDataMap.put("status", state.getStatus());
-      jobDataMap.put("live", state.isLive());
+      Map<String, String> jobDataMap = new HashMap<>();
+      jobDataMap.put("status", Optional.ofNullable(state.getStatus()).map(Objects::toString).orElse(null));
+      jobDataMap.put("live", String.valueOf(state.isLive()));
       jobDataMap.put("playlist", state.getPlaylist());
       jobDataMap.put("mediaName", state.getMediaName());
-      jobDataMap.put("mediaDuration", state.getMediaDuration());
-      jobDataMap.put("startTime", state.getStartTime());
-      jobDataMap.put("endTime", state.getEndTime());
-      jobDataMap.put("seekTime", state.getSeekTime());
+      jobDataMap.put("mediaDuration", Optional.ofNullable(state.getMediaDuration()).map(Duration::toString).orElse(null));
+      jobDataMap.put("startTime", Optional.ofNullable(state.getStartTime()).map(Instant::toString).orElse(null));
+      jobDataMap.put("endTime", Optional.ofNullable(state.getEndTime()).map(Instant::toString).orElse(null));
+      jobDataMap.put("seekTime", Optional.ofNullable(state.getSeekTime()).map(Duration::toString).orElse(null));
       Utils.beanProxy(scheduleManagerName, ScheduleManagerMBean.class)
               .triggerIfExists( "Stream", String.valueOf(state), jobDataMap);
     }

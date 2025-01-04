@@ -19,7 +19,6 @@ import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.FileSystemAccess;
 import io.vertx.ext.web.handler.StaticHandler;
 import net.akaritakai.stream.chat.ChatManager;
-import net.akaritakai.stream.chat.ChatManagerMBean;
 import net.akaritakai.stream.config.Config;
 import net.akaritakai.stream.config.ConfigData;
 import net.akaritakai.stream.config.ShutdownAction;
@@ -31,12 +30,8 @@ import net.akaritakai.stream.handler.telemetry.TelemetryFetchHandler;
 import net.akaritakai.stream.handler.telemetry.TelemetrySendHandler;
 import net.akaritakai.stream.log.DashboardLogAppender;
 import net.akaritakai.stream.scheduling.ScheduleManager;
-import net.akaritakai.stream.scheduling.ScheduleManagerMBean;
 import net.akaritakai.stream.script.ScriptManager;
-import net.akaritakai.stream.script.ScriptManagerMBean;
-import net.akaritakai.stream.scheduling.Utils;
 import net.akaritakai.stream.streamer.Streamer;
-import net.akaritakai.stream.streamer.StreamerMBean;
 import net.akaritakai.stream.telemetry.TelemetryStore;
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.helper.HelpScreenException;
@@ -246,12 +241,8 @@ public class Main {
         ScriptManager scriptManager = new ScriptManager(startTimer);
         mBeanServer.registerMBean(scriptManager, scriptManagerName);
 
-        ScheduleManager scheduleManager = new ScheduleManager(startTimer, config, shutdownActions);
+        ScheduleManager scheduleManager = new ScheduleManager(startTimer);
         mBeanServer.registerMBean(scheduleManager, scheduleManagerName);
-
-        Utils.set(scheduleManager.scheduler(), ScriptManagerMBean.KEY, scriptManagerName);
-        Utils.set(scheduleManager.scheduler(), ScheduleManagerMBean.KEY, scheduleManagerName);
-
 
         CheckAuth auth = new CheckAuthImpl(
                 Optional.ofNullable(ns.getString("apiKey")).orElse(config.getApiKey()));
@@ -262,6 +253,21 @@ public class Main {
         shutdownExecutor = task -> vertx.executeBlocking(Executors.callable(task));
         shutdownActions.add(() -> vertx.close().toCompletionStage().toCompletableFuture().join());
 
+        TelemetryStore telemetryStore = new TelemetryStore();
+
+        Streamer streamer = new Streamer(vertx, config);
+        mBeanServer.registerMBean(streamer, streamerName);
+        startTimer.touch("streamer created");
+
+        ChatManager chatManager = new ChatManager(startTimer, config);
+        mBeanServer.registerMBean(chatManager, chatManagerName);
+        startTimer.touch("Chat manager created");
+
+        chatManager.addCustomEmojis(Optional.ofNullable(ns.getString("emojisFile")).map(File::new)
+                        .orElse(Optional.ofNullable(config.getEmojisFile()).map(File::new).orElse(null)));
+        startTimer.touch("after loading custom emojis");
+
+        /* Now to setup the vertx router */
         router = new RouterHelper(vertx, sslApi);
 
         Optional.of((Handler<RoutingContext>) event -> {
@@ -283,8 +289,6 @@ public class Main {
             router.failureHandler(ctx, handler);
         });
 
-        TelemetryStore telemetryStore = new TelemetryStore();
-
         if (config.isLogRequestInfo()) {
             Optional.of((Handler<RoutingContext>) event -> {
                 HttpServerRequest request = event.request();
@@ -296,20 +300,8 @@ public class Main {
             }).ifPresent(router::handler);
         }
 
-        Streamer streamer = new Streamer(vertx, config);
-        mBeanServer.registerMBean(streamer, streamerName);
-        Streamer.register(vertx, router, auth, streamerName);
-        Utils.set(scheduleManager.scheduler(), StreamerMBean.KEY, streamerName);
-        startTimer.touch("streamer created");
-
-        ChatManager chatManager = new ChatManager(startTimer, config);
-        mBeanServer.registerMBean(chatManager, chatManagerName);
-        ChatManager.register(vertx, router, auth, chatManagerName);
-        Utils.set(scheduleManager.scheduler(), ChatManagerMBean.KEY, chatManagerName);
-        startTimer.touch("Chat manager created");
-
-        chatManager.addCustomEmojis(Optional.ofNullable(ns.getString("emojisFile")).map(File::new)
-                        .orElse(Optional.ofNullable(config.getEmojisFile()).map(File::new).orElse(null)));
+        registerGetHandler("/health", new HealthCheckHandler());
+        registerGetHandler("/time", new TimeHandler());
 
         registerPostApiHandler("/telemetry/fetch", new TelemetryFetchHandler(telemetryStore, auth));
         registerGetHandler("/telemetry", new TelemetrySendHandler(telemetryStore));
@@ -317,10 +309,9 @@ public class Main {
         registerPostApiHandler("/log/fetch", new LogFetchHandler(vertx, auth));
         registerGetHandler("/log", new LogSendHandler());
 
+        Streamer.register(vertx, router, auth, streamerName);
+        ChatManager.register(vertx, router, auth, chatManagerName);
         ScheduleManager.register(vertx, router, auth);
-
-        registerGetHandler("/health", new HealthCheckHandler());
-        registerGetHandler("/time", new TimeHandler());
 
         final int[] httpPort = new int[2];
 
@@ -429,8 +420,7 @@ public class Main {
                 .onSuccess(event -> {
                     startTimer.touch("Ports bound");
                     try {
-                        scheduleManager.scheduler().start();
-                        scheduleManager.triggerIfExists("start");
+                        scheduleManager.start(config, shutdownActions);
                     } catch (SchedulerException e) {
                         shutdown.completeExceptionally(e);
                         return;
@@ -440,7 +430,6 @@ public class Main {
                     exitCode = 0;
                 })
                 .onFailure(shutdown::completeExceptionally);
-
     }
 
     private void registerGetHandler(String uri, Handler<RoutingContext> handler) {

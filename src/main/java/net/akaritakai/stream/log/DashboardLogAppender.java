@@ -20,23 +20,11 @@ public class DashboardLogAppender<E> extends OutputStreamAppender<E> {
     public DashboardLogAppender() {
     }
 
-    /**
-     * Gets the immediate flush setting.
-     *
-     * @return immediate flush.
-     */
-    public boolean getImmediateFlush() {
-        return _immediateFlush;
-    }
-
     @Override
     protected void append(E event) {
         try {
             synchronized (getGlobalOutputStream()) {
                 super.append(event);
-                if (getImmediateFlush()) {
-                    getGlobalOutputStream().flush();
-                }
             }
         } catch (Throwable ex) {
            addError("Unable to write to stream for appender " + getName() + " event: " + event, ex);

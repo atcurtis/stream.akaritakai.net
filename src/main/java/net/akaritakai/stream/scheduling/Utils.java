@@ -2,6 +2,7 @@ package net.akaritakai.stream.scheduling;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import net.akaritakai.stream.models.quartz.KeyEntry;
 import org.quartz.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,6 +11,8 @@ import javax.management.JMX;
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
 import java.lang.management.ManagementFactory;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.WeakHashMap;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -60,6 +63,7 @@ public class Utils {
     public static void triggerIfExists(Scheduler scheduler, String name, JobDataMap jobDataMap) {
         triggerIfExists(scheduler, JobKey.jobKey(name), jobDataMap);
     }
+
     public static void triggerIfExists(Scheduler scheduler, String name, String group, JobDataMap jobDataMap) {
         triggerIfExists(scheduler, JobKey.jobKey(name, group), jobDataMap);
     }
@@ -86,4 +90,49 @@ public class Utils {
             throw new CompletionException(e);
         }
     }
+
+    public static JobKey jobKey(KeyEntry entry) {
+        String group = entry.getGroup();
+        return group != null
+                ? new JobKey(entry.getName(), group)
+                : new JobKey(entry.getName());
+    }
+
+    public static TriggerKey triggerKey(KeyEntry entry) {
+        String group = entry.getGroup();
+        return group != null
+                ? new TriggerKey(entry.getName(), group)
+                : new TriggerKey(entry.getName());
+    }
+
+    public static KeyEntry keyEntry(JobKey key) {
+        KeyEntry.KeyEntryBuilder builder = KeyEntry.builder().name(key.getName());
+        String group = key.getGroup();
+        return (group != null ? builder.group(group) : builder).build();
+    }
+
+    public static KeyEntry keyEntry(TriggerKey key) {
+        KeyEntry.KeyEntryBuilder builder = KeyEntry.builder().name(key.getName());
+        String group = key.getGroup();
+        return (group != null ? builder.group(group) : builder).build();
+    }
+
+    public static String stringify(Object o) {
+        if (!(o instanceof CharSequence || o instanceof Number)) {
+            try {
+                return OBJECT_MAPPER.writeValueAsString(o);
+            } catch (JsonProcessingException e) {
+                LOG.debug("Couldn't json", e);
+            }
+        }
+        return o != null ? o.toString() : null;
+    }
+
+    public static Map<String, String> jobDataMap(JobDataMap map) {
+        Map<String, String> jobDataMap = new HashMap<>();
+        map.forEach((key, value) -> jobDataMap.put(key, stringify(value)));
+        return jobDataMap;
+    }
+
+
 }

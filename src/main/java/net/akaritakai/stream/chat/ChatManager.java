@@ -2,6 +2,7 @@ package net.akaritakai.stream.chat;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.URL;
 import java.time.Instant;
 import java.util.*;
@@ -123,11 +124,11 @@ public class ChatManager extends NotificationBroadcasterSupport implements ChatM
       Notification n = new AttributeChangeNotification(this, _sequenceNumber.getAndIncrement(), System.currentTimeMillis(),
               "sendMessage", "Message", ChatMessage.class.getName(), null, message);
       sendNotification(n);
-      JobDataMap jobDataMap = new JobDataMap();
+      Map<String, String> jobDataMap = new HashMap<>();
       jobDataMap.put("type", String.valueOf(request.getMessageType()));
       jobDataMap.put("nick", request.getNickname());
       jobDataMap.put("message", request.getMessage());
-      jobDataMap.put("source", request.getSource());
+      jobDataMap.put("source", Optional.ofNullable(request.getSource()).map(InetAddress::getHostAddress).orElse(null));
       Utils.beanProxy(scheduleManagerName, ScheduleManagerMBean.class)
               .triggerIfExists("Message", "Chat", jobDataMap);
     }

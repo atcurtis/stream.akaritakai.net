@@ -9,6 +9,8 @@ public final class GlobalNames {
 
     public static final String ROOT_LOGGER_NAME = ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME;
 
+    public static final String JDBC_URL = "jdbc:sqlite:scheduler.db";
+
     public static final ObjectName streamerName;
     public static final ObjectName chatManagerName;
     public static final ObjectName scriptManagerName;

@@ -5,12 +5,10 @@ import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.http.HttpServerResponse;
 import net.akaritakai.stream.CheckAuth;
 import net.akaritakai.stream.handler.AbstractBlockingHandler;
-import net.akaritakai.stream.handler.AbstractHandler;
 import net.akaritakai.stream.models.quartz.request.PauseAllRequest;
 import net.akaritakai.stream.scheduling.ScheduleManagerMBean;
 import net.akaritakai.stream.scheduling.Utils;
 import org.apache.commons.lang3.Validate;
-import org.quartz.Scheduler;
 
 import static net.akaritakai.stream.config.GlobalNames.scheduleManagerName;
 

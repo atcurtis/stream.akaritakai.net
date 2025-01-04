@@ -12,8 +12,6 @@ import net.akaritakai.stream.models.quartz.response.ListTriggersResponse;
 import net.akaritakai.stream.scheduling.ScheduleManagerMBean;
 import net.akaritakai.stream.scheduling.Utils;
 import org.apache.commons.lang3.Validate;
-import org.quartz.*;
-import org.quartz.impl.matchers.GroupMatcher;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -38,31 +36,8 @@ public class TriggersHandler extends AbstractBlockingHandler<ListTriggersRequest
         executeBlocking(() -> {
             ScheduleManagerMBean manager = Utils.beanProxy(scheduleManagerName, ScheduleManagerMBean.class);
             List<TriggerEntry> triggers = new ArrayList<>();
-            for (TriggerKey triggerKey : manager.getTriggerKeys(groupPrefix == null
-                    ? GroupMatcher.anyTriggerGroup()
-                    : GroupMatcher.triggerGroupStartsWith(groupPrefix))) {
-                Trigger trigger = manager.getTrigger(triggerKey);
-                triggers.add(TriggerEntry.builder()
-                        .key(KeyEntry.builder()
-                                .name(trigger.getKey().getName())
-                                .group(trigger.getKey().getGroup())
-                                .build())
-                        .job(KeyEntry.builder()
-                                .name(trigger.getJobKey().getName())
-                                .group(trigger.getJobKey().getName())
-                                .build())
-                        .jobDataMap(QuartzUtils.mapOf(trigger.getJobDataMap()))
-                        .description(trigger.getDescription())
-                        .calendar(trigger.getCalendarName())
-                        .priority(trigger.getPriority())
-                        .mayFireAgain(trigger.mayFireAgain())
-                        .startTime(QuartzUtils.instantOf(trigger.getStartTime()))
-                        .endTime(QuartzUtils.instantOf(trigger.getEndTime()))
-                        .nextFireTime(QuartzUtils.instantOf(trigger.getNextFireTime()))
-                        .previousFireTime(QuartzUtils.instantOf(trigger.getPreviousFireTime()))
-                        .finalFireTime(QuartzUtils.instantOf(trigger.getFinalFireTime()))
-                        .misfireInstruction(trigger.getMisfireInstruction())
-                        .build());
+            for (KeyEntry triggerKey : manager.getTriggerKeys(groupPrefix)) {
+                triggers.add(manager.getTrigger(triggerKey));
             }
             return ListTriggersResponse.builder().triggers(triggers).build();
         })

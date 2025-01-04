@@ -7,6 +7,7 @@ import net.akaritakai.stream.debug.TouchTimer;
 import net.akaritakai.stream.json.ExceptionConverter;
 import net.akaritakai.stream.models.quartz.TaskEntry;
 import net.akaritakai.stream.models.quartz.TaskResult;
+import net.akaritakai.stream.scheduling.ScheduleManagerMBean;
 import net.akaritakai.stream.scheduling.Utils;
 import net.akaritakai.stream.streamer.StreamerMBean;
 import org.slf4j.Logger;
@@ -72,9 +73,10 @@ public class ScriptManager implements ScriptManagerMBean {
 
         scope.put("log", LOG);
 
-        //scope.put("scheduler", Utils.beanProxy(scheduleManagerName, ScheduleManagerMBean.class));
         expose(scope, "chat", chatManagerName, ChatManagerMBean.class);
         expose(scope, "streamer", streamerName, StreamerMBean.class);
+        expose(scope, "scriptManager", scriptManagerName, ScriptManagerMBean.class);
+        expose(scope, "scheduleManager", scheduleManagerName, ScheduleManagerMBean.class);
 
         try {
             resultBuilder.success(false);
@@ -119,7 +121,7 @@ public class ScriptManager implements ScriptManagerMBean {
 
         if (type.getPackageName().startsWith("net.akaritakai.stream.models.")
                 && Stream.of(type.getMethods()).anyMatch(m -> Modifier.isStatic(m.getModifiers()))) {
-            LOG.info("Exposing {}", type.getName());
+            LOG.debug("Exposing {}", type.getName());
             scope.put(type.getSimpleName(), type);
         }
 
