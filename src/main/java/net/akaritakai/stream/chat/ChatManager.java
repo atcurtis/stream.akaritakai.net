@@ -1,5 +1,8 @@
 package net.akaritakai.stream.chat;
 
+import java.io.File;
+import java.io.IOException;
+import java.net.URL;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -10,19 +13,26 @@ import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
+import net.akaritakai.stream.CheckAuth;
+import net.akaritakai.stream.config.ConfigData;
+import net.akaritakai.stream.debug.TouchTimer;
 import net.akaritakai.stream.exception.ChatStateConflictException;
+import net.akaritakai.stream.handler.RouterHelper;
 import net.akaritakai.stream.handler.Util;
+import net.akaritakai.stream.handler.chat.*;
 import net.akaritakai.stream.models.chat.ChatMessage;
 import net.akaritakai.stream.models.chat.ChatMessageType;
 import net.akaritakai.stream.models.chat.ChatSequence;
 import net.akaritakai.stream.models.chat.request.ChatJoinRequest;
 import net.akaritakai.stream.models.chat.request.ChatSendRequest;
 import net.akaritakai.stream.models.chat.response.ChatStatusResponse;
+import net.akaritakai.stream.scheduling.ScheduleManagerMBean;
 import net.akaritakai.stream.scheduling.Utils;
 import org.quartz.JobDataMap;
-import org.quartz.Scheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,20 +40,46 @@ import javax.annotation.Nonnull;
 import javax.management.AttributeChangeNotification;
 import javax.management.Notification;
 import javax.management.NotificationBroadcasterSupport;
+import javax.management.ObjectName;
 
+import static net.akaritakai.stream.config.GlobalNames.*;
 
 public class ChatManager extends NotificationBroadcasterSupport implements ChatManagerMBean {
   private static final Logger LOG = LoggerFactory.getLogger(ChatManager.class);
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private final AtomicReference<ChatHistory> _history = new AtomicReference<>(null);
 
   private final ConcurrentMap<String, String> _customEmojiMap = new ConcurrentHashMap<>();
-  private final Scheduler _scheduler;
+
   private final AtomicInteger _sequenceNumber = new AtomicInteger();
 
-  public ChatManager(Scheduler scheduler) {
-    _scheduler = scheduler;
+  public ChatManager(TouchTimer startTimer, ConfigData config) {
+
+  }
+
+  public static void register(Vertx vertx, RouterHelper router, CheckAuth checkAuth, ObjectName chatManagerName) {
+    router.registerPostApiHandler("/chat/clear", new ChatClearHandler(chatManagerName, checkAuth, vertx));
+    router.registerPostApiHandler("/chat/disable", new ChatDisableHandler(chatManagerName, checkAuth, vertx));
+    router.registerPostApiHandler("/chat/enable", new ChatEnableHandler(chatManagerName, checkAuth, vertx));
+    router.registerPostApiHandler("/chat/write", new ChatWriteHandler(chatManagerName, checkAuth));
+    router.registerPostApiHandler("/chat/emojis", new ChatListEmojisHandler(chatManagerName, checkAuth));
+    router.registerPostApiHandler("/chat/emoji", new ChatSetEmojiHandler(chatManagerName, checkAuth));
+    router.registerGetHandler("/chat", new ChatClientHandler(vertx, chatManagerName));
+  }
+
+  public void addCustomEmojis(File jsonFile) throws IOException {
+    if (jsonFile != null) {
+      for (Map.Entry<String, String> entry : new ObjectMapper()
+              .readValue(jsonFile, new TypeReference<Map<String, String>>() {
+              }).entrySet()) {
+        if (entry.getValue() != null) {
+          if (entry.getKey().isBlank()) {
+            throw new IllegalArgumentException("key name can't be blank");
+          }
+          setCustomEmoji(":" + entry.getKey() + ":", new URL(entry.getValue()).toString());
+        }
+      }
+    }
   }
 
   @Override
@@ -92,7 +128,8 @@ public class ChatManager extends NotificationBroadcasterSupport implements ChatM
       jobDataMap.put("nick", request.getNickname());
       jobDataMap.put("message", request.getMessage());
       jobDataMap.put("source", request.getSource());
-      Utils.triggerIfExists(_scheduler, "Message", "Chat", jobDataMap);
+      Utils.beanProxy(scheduleManagerName, ScheduleManagerMBean.class)
+              .triggerIfExists("Message", "Chat", jobDataMap);
     }
   }
 
@@ -107,7 +144,8 @@ public class ChatManager extends NotificationBroadcasterSupport implements ChatM
       Notification n = new AttributeChangeNotification(this, _sequenceNumber.getAndIncrement(), System.currentTimeMillis(),
               "disableChat", "History", ChatHistory.class.getName(), oldHistory, null);
       sendNotification(n);
-      Utils.triggerIfExists(_scheduler, "disableChat", "Chat");
+      Utils.beanProxy(scheduleManagerName, ScheduleManagerMBean.class)
+                      .triggerIfExists("disableChat", "Chat");
     }
   }
 
@@ -123,7 +161,8 @@ public class ChatManager extends NotificationBroadcasterSupport implements ChatM
       Notification n = new AttributeChangeNotification(this, _sequenceNumber.getAndIncrement(), System.currentTimeMillis(),
               "enableChat", "History", ChatHistory.class.getName(), oldHistory, newHistory);
       sendNotification(n);
-      Utils.triggerIfExists(_scheduler, "enableChat", "Chat");
+      Utils.beanProxy(scheduleManagerName, ScheduleManagerMBean.class)
+              .triggerIfExists("enableChat", "Chat");
     }
   }
 
@@ -139,7 +178,8 @@ public class ChatManager extends NotificationBroadcasterSupport implements ChatM
       Notification n = new AttributeChangeNotification(this, _sequenceNumber.getAndIncrement(), System.currentTimeMillis(),
               "clearChat", "History", ChatHistory.class.getName(), oldHistory, newHistory);
       sendNotification(n);
-      Utils.triggerIfExists(_scheduler, "clearChat", "Chat");
+      Utils.beanProxy(scheduleManagerName, ScheduleManagerMBean.class)
+              .triggerIfExists("clearChat", "Chat");
     }
   }
 

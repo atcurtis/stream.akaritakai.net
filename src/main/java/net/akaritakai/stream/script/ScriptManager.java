@@ -1,11 +1,13 @@
-package net.akaritakai.stream.scheduling;
+package net.akaritakai.stream.script;
 
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import net.akaritakai.stream.chat.ChatManagerMBean;
+import net.akaritakai.stream.debug.TouchTimer;
 import net.akaritakai.stream.json.ExceptionConverter;
 import net.akaritakai.stream.models.quartz.TaskEntry;
 import net.akaritakai.stream.models.quartz.TaskResult;
+import net.akaritakai.stream.scheduling.Utils;
 import net.akaritakai.stream.streamer.StreamerMBean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +30,18 @@ public class ScriptManager implements ScriptManagerMBean {
 
     private final ScriptEngine _scriptEngine;
 
+    public ScriptManager(TouchTimer timer) {
+        this(new ScriptEngineManager().getEngineByMimeType("application/javascript"));
+        LOG.info("ScriptEngine: {}", _scriptEngine);
+
+        Bindings bindings = _scriptEngine.getBindings(ScriptContext.ENGINE_SCOPE);
+        bindings.put("polyglot.js.allowHostAccess", true);
+        bindings.put("polyglot.js.allowHostClassLookup", (Predicate<String>) s -> {
+            LOG.warn("ScriptEngine class lookup: {}", s);
+            return true;
+        });
+        timer.touch("ScriptEngine: {}", _scriptEngine);
+    }
 
     public ScriptManager(ScriptEngine scriptEngine) {
         _scriptEngine = scriptEngine;

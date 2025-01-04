@@ -18,26 +18,22 @@ import io.vertx.core.net.SelfSignedCertificate;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.FileSystemAccess;
 import io.vertx.ext.web.handler.StaticHandler;
-import net.akaritakai.stream.chat.Chat;
+import net.akaritakai.stream.chat.ChatManager;
+import net.akaritakai.stream.chat.ChatManagerMBean;
 import net.akaritakai.stream.config.Config;
 import net.akaritakai.stream.config.ConfigData;
+import net.akaritakai.stream.config.ShutdownAction;
 import net.akaritakai.stream.debug.TouchTimer;
 import net.akaritakai.stream.handler.*;
 import net.akaritakai.stream.handler.info.LogFetchHandler;
 import net.akaritakai.stream.handler.info.LogSendHandler;
-import net.akaritakai.stream.handler.quartz.*;
-import net.akaritakai.stream.handler.stream.DirCommandHandler;
-import net.akaritakai.stream.handler.stream.PauseCommandHandler;
-import net.akaritakai.stream.handler.stream.ResumeCommandHandler;
-import net.akaritakai.stream.handler.stream.StartCommandHandler;
-import net.akaritakai.stream.handler.stream.StopCommandHandler;
-import net.akaritakai.stream.handler.stream.StreamStatusHandler;
 import net.akaritakai.stream.handler.telemetry.TelemetryFetchHandler;
 import net.akaritakai.stream.handler.telemetry.TelemetrySendHandler;
 import net.akaritakai.stream.log.DashboardLogAppender;
-import net.akaritakai.stream.scheduling.ScriptManager;
-import net.akaritakai.stream.scheduling.ScriptManagerMBean;
-import net.akaritakai.stream.scheduling.SetupScheduler;
+import net.akaritakai.stream.scheduling.ScheduleManager;
+import net.akaritakai.stream.scheduling.ScheduleManagerMBean;
+import net.akaritakai.stream.script.ScriptManager;
+import net.akaritakai.stream.script.ScriptManagerMBean;
 import net.akaritakai.stream.scheduling.Utils;
 import net.akaritakai.stream.streamer.Streamer;
 import net.akaritakai.stream.streamer.StreamerMBean;
@@ -48,23 +44,17 @@ import net.sourceforge.argparse4j.impl.Arguments;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import net.sourceforge.argparse4j.inf.Namespace;
-import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.management.MBeanServer;
-import javax.script.Bindings;
-import javax.script.ScriptContext;
-import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
 import java.io.File;
 import java.lang.management.ManagementFactory;
 import java.net.MalformedURLException;
 import java.nio.channels.ClosedChannelException;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.function.Predicate;
 
 import static net.akaritakai.stream.config.GlobalNames.*;
 
@@ -253,24 +243,15 @@ public class Main {
         Optional<SelfSignedCertificate> ssc = Optional.of(SelfSignedCertificate.create());
         ssc.ifPresent(s -> shutdownActions.add(s::delete));
 
-        ScriptEngine scriptEngine = new ScriptEngineManager().getEngineByMimeType("application/javascript");
-        LOG.info("ScriptEngine: {}", scriptEngine);
-        Bindings bindings = scriptEngine.getBindings(ScriptContext.ENGINE_SCOPE);
-        bindings.put("polyglot.js.allowHostAccess", true);
-        bindings.put("polyglot.js.allowHostClassLookup", (Predicate<String>) s -> {
-            LOG.warn("ScriprEngine class lookup: {}", s);
-            return true;
-        });
-        startTimer.touch("ScriptEngine: {}", scriptEngine);
-
-        Scheduler scheduler = SetupScheduler.createFactory().getScheduler();
-        Utils.set(scheduler, Config.KEY, config);
-        startTimer.touch("scheduler created");
-        shutdownActions.add(scheduler::shutdown);
-
-        ScriptManager scriptManager = new ScriptManager(scriptEngine);
+        ScriptManager scriptManager = new ScriptManager(startTimer);
         mBeanServer.registerMBean(scriptManager, scriptManagerName);
-        Utils.set(scheduler, ScriptManagerMBean.KEY, scriptManagerName);
+
+        ScheduleManager scheduleManager = new ScheduleManager(startTimer, config, shutdownActions);
+        mBeanServer.registerMBean(scheduleManager, scheduleManagerName);
+
+        Utils.set(scheduleManager.scheduler(), ScriptManagerMBean.KEY, scriptManagerName);
+        Utils.set(scheduleManager.scheduler(), ScheduleManagerMBean.KEY, scheduleManagerName);
+
 
         CheckAuth auth = new CheckAuthImpl(
                 Optional.ofNullable(ns.getString("apiKey")).orElse(config.getApiKey()));
@@ -302,11 +283,6 @@ public class Main {
             router.failureHandler(ctx, handler);
         });
 
-        Streamer streamer = new Streamer(vertx, config, scheduler);
-        mBeanServer.registerMBean(streamer, streamerName);
-        Utils.set(scheduler, StreamerMBean.KEY, streamerName);
-        startTimer.touch("streamer created");
-
         TelemetryStore telemetryStore = new TelemetryStore();
 
         if (config.isLogRequestInfo()) {
@@ -320,17 +296,20 @@ public class Main {
             }).ifPresent(router::handler);
         }
 
-        registerGetHandler("/stream/status", new StreamStatusHandler(vertx));
-        registerPostApiHandler("/stream/start", new StartCommandHandler(auth, vertx));
-        registerPostApiHandler("/stream/stop", new StopCommandHandler(auth, vertx));
-        registerPostApiHandler("/stream/pause", new PauseCommandHandler(auth, vertx));
-        registerPostApiHandler("/stream/resume", new ResumeCommandHandler(auth, vertx));
-        registerPostApiHandler("/stream/dir", new DirCommandHandler(auth, vertx));
+        Streamer streamer = new Streamer(vertx, config);
+        mBeanServer.registerMBean(streamer, streamerName);
+        Streamer.register(vertx, router, auth, streamerName);
+        Utils.set(scheduleManager.scheduler(), StreamerMBean.KEY, streamerName);
+        startTimer.touch("streamer created");
 
-        new Chat(vertx, router, scheduler, auth, mBeanServer)
-                .addCustomEmojis(Optional.ofNullable(ns.getString("emojisFile")).map(File::new)
-                        .orElse(Optional.ofNullable(config.getEmojisFile()).map(File::new).orElse(null)))
-                .install();
+        ChatManager chatManager = new ChatManager(startTimer, config);
+        mBeanServer.registerMBean(chatManager, chatManagerName);
+        ChatManager.register(vertx, router, auth, chatManagerName);
+        Utils.set(scheduleManager.scheduler(), ChatManagerMBean.KEY, chatManagerName);
+        startTimer.touch("Chat manager created");
+
+        chatManager.addCustomEmojis(Optional.ofNullable(ns.getString("emojisFile")).map(File::new)
+                        .orElse(Optional.ofNullable(config.getEmojisFile()).map(File::new).orElse(null)));
 
         registerPostApiHandler("/telemetry/fetch", new TelemetryFetchHandler(telemetryStore, auth));
         registerGetHandler("/telemetry", new TelemetrySendHandler(telemetryStore));
@@ -338,14 +317,7 @@ public class Main {
         registerPostApiHandler("/log/fetch", new LogFetchHandler(vertx, auth));
         registerGetHandler("/log", new LogSendHandler());
 
-        registerPostApiHandler("/quartz/execute", new ExecuteHandler(vertx, auth));
-        registerPostApiHandler("/quartz/status", new StatusHandler(scheduler, auth));
-        registerPostApiHandler("/quartz/standby", new StandbyHandler(scheduler, auth));
-        registerPostApiHandler("/quartz/pauseAll", new PauseAllHandler(scheduler, auth));
-        registerPostApiHandler("/quartz/resumeAll", new ResumeAllHandler(scheduler, auth));
-
-        registerPostApiHandler("/quartz/jobs", new JobsHandler(scheduler, auth));
-        registerPostApiHandler("/quartz/triggers", new TriggersHandler(scheduler, auth));
+        ScheduleManager.register(vertx, router, auth);
 
         registerGetHandler("/health", new HealthCheckHandler());
         registerGetHandler("/time", new TimeHandler());
@@ -400,7 +372,7 @@ public class Main {
 
 
         startTimer.touch("SetupScheduler");
-        SetupScheduler.setup(scheduler);
+        ScheduleManager.setup(scheduleManager.scheduler());
 
         Promise<Void> startHttp = Promise.promise();
         Promise<Void> startHttps = Promise.promise();
@@ -457,8 +429,8 @@ public class Main {
                 .onSuccess(event -> {
                     startTimer.touch("Ports bound");
                     try {
-                        scheduler.start();
-                        Utils.triggerIfExists(scheduler, "start");
+                        scheduleManager.scheduler().start();
+                        scheduleManager.triggerIfExists("start");
                     } catch (SchedulerException e) {
                         shutdown.completeExceptionally(e);
                         return;
@@ -477,9 +449,5 @@ public class Main {
 
     private void registerPostApiHandler(String uri, Handler<RoutingContext> handler) {
         router.registerPostApiHandler(uri, handler);
-    }
-
-    private interface ShutdownAction {
-        void call() throws Exception;
     }
 }

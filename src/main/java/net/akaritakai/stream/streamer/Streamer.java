@@ -18,19 +18,22 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
+import net.akaritakai.stream.CheckAuth;
 import net.akaritakai.stream.client.AwsS3Client;
 import net.akaritakai.stream.client.FakeAwsS3Client;
 import net.akaritakai.stream.config.ConfigData;
 import net.akaritakai.stream.exception.StreamStateConflictException;
+import net.akaritakai.stream.handler.RouterHelper;
+import net.akaritakai.stream.handler.stream.*;
 import net.akaritakai.stream.models.stream.StreamEntry;
 import net.akaritakai.stream.models.stream.StreamMetadata;
 import net.akaritakai.stream.models.stream.StreamState;
 import net.akaritakai.stream.models.stream.StreamStateType;
 import net.akaritakai.stream.models.stream.request.StreamResumeRequest;
 import net.akaritakai.stream.models.stream.request.StreamStartRequest;
+import net.akaritakai.stream.scheduling.ScheduleManagerMBean;
 import net.akaritakai.stream.scheduling.Utils;
 import org.quartz.JobDataMap;
-import org.quartz.Scheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,6 +41,9 @@ import javax.annotation.Nonnull;
 import javax.management.AttributeChangeNotification;
 import javax.management.Notification;
 import javax.management.NotificationBroadcasterSupport;
+import javax.management.ObjectName;
+
+import static net.akaritakai.stream.config.GlobalNames.scheduleManagerName;
 
 
 public class Streamer extends NotificationBroadcasterSupport implements StreamerMBean {
@@ -49,12 +55,10 @@ public class Streamer extends NotificationBroadcasterSupport implements Streamer
   private final String _livePlaylistUrl;
   private final AtomicReference<StreamState> _state = new AtomicReference<>(StreamState.OFFLINE);
 
-  private final Scheduler _scheduler;
   private final AtomicInteger _sequenceNumber = new AtomicInteger();
 
-  public Streamer(Vertx vertx, ConfigData config, Scheduler scheduler) {
+  public Streamer(Vertx vertx, ConfigData config) {
     _vertx = vertx;
-    _scheduler = scheduler;
     if (config.isDevelopment() || !config.isAwsDirectory()) {
       _client = new FakeAwsS3Client(vertx, config);
     } else {
@@ -62,6 +66,16 @@ public class Streamer extends NotificationBroadcasterSupport implements Streamer
     }
     _livePlaylistUrl = config.getLivePlaylistUrl();
   }
+
+  public static void register(Vertx vertx, RouterHelper router, CheckAuth auth, ObjectName streamerName) {
+    router.registerGetHandler("/stream/status", new StreamStatusHandler(vertx));
+    router.registerPostApiHandler("/stream/start", new StartCommandHandler(auth, vertx));
+    router.registerPostApiHandler("/stream/stop", new StopCommandHandler(auth, vertx));
+    router.registerPostApiHandler("/stream/pause", new PauseCommandHandler(auth, vertx));
+    router.registerPostApiHandler("/stream/resume", new ResumeCommandHandler(auth, vertx));
+    router.registerPostApiHandler("/stream/dir", new DirCommandHandler(auth, vertx));
+  }
+
 
   static StreamState.StreamStateBuilder builder(StreamState state) {
     return StreamState.builder()
@@ -242,7 +256,8 @@ public class Streamer extends NotificationBroadcasterSupport implements Streamer
       jobDataMap.put("startTime", state.getStartTime());
       jobDataMap.put("endTime", state.getEndTime());
       jobDataMap.put("seekTime", state.getSeekTime());
-      Utils.triggerIfExists(_scheduler, "Stream", String.valueOf(state), jobDataMap);
+      Utils.beanProxy(scheduleManagerName, ScheduleManagerMBean.class)
+              .triggerIfExists( "Stream", String.valueOf(state), jobDataMap);
     }
   }
 

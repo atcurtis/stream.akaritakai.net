@@ -1,7 +1,8 @@
-package net.akaritakai.stream.scheduling;
+package net.akaritakai.stream.script;
 
 import net.akaritakai.stream.models.quartz.TaskEntry;
 import net.akaritakai.stream.models.quartz.TaskResult;
+import net.akaritakai.stream.scheduling.SchedulerAttribute;
 
 import javax.management.ObjectName;
 

@@ -1,20 +1,21 @@
 package net.akaritakai.stream.handler.quartz;
 
+import io.vertx.core.Vertx;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.http.HttpServerResponse;
 import net.akaritakai.stream.CheckAuth;
-import net.akaritakai.stream.handler.AbstractHandler;
+import net.akaritakai.stream.handler.AbstractBlockingHandler;
 import net.akaritakai.stream.models.quartz.request.StandbyRequest;
+import net.akaritakai.stream.scheduling.ScheduleManagerMBean;
+import net.akaritakai.stream.scheduling.Utils;
 import org.apache.commons.lang3.Validate;
-import org.quartz.Scheduler;
 
-public class StandbyHandler extends AbstractHandler<StandbyRequest> {
+import static net.akaritakai.stream.config.GlobalNames.scheduleManagerName;
 
-    private final Scheduler _scheduler;
+public class StandbyHandler extends AbstractBlockingHandler<StandbyRequest> {
 
-    public StandbyHandler(Scheduler scheduler, CheckAuth checkAuth) {
-        super(StandbyRequest.class, checkAuth);
-        _scheduler = scheduler;
+    public StandbyHandler(Vertx vertx, CheckAuth checkAuth) {
+        super(StandbyRequest.class, vertx, checkAuth);
     }
 
     @Override
@@ -24,15 +25,16 @@ public class StandbyHandler extends AbstractHandler<StandbyRequest> {
 
     @Override
     protected void handleAuthorized(HttpServerRequest httpRequest, StandbyRequest listJobsRequest, HttpServerResponse response) {
-        try {
-            if (_scheduler.isInStandbyMode()) {
-                handleFailure("Already in standby mode", response, new IllegalStateException());
-                return;
+        executeBlocking(() -> {
+            ScheduleManagerMBean manager = Utils.beanProxy(scheduleManagerName, ScheduleManagerMBean.class);
+            if (manager.isInStandbyMode()) {
+                throw new IllegalStateException("Already in standby mode");
             }
-            _scheduler.standby();
+            manager.standby();
             handleSuccess("OK", "text/plain", response);
-            } catch (Exception e) {
-            handleFailure("Error setting standby", response, e);
-        }
+            return null;
+        })
+                .onSuccess(unused -> handleSuccess("OK", "text/plain", response))
+                .onFailure(ex -> handleFailure("Cannot switch to stand-by", response, ex));
     }
 }

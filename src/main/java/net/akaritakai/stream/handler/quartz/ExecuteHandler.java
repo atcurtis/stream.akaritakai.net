@@ -8,7 +8,7 @@ import net.akaritakai.stream.CheckAuth;
 import net.akaritakai.stream.handler.AbstractHandler;
 import net.akaritakai.stream.models.quartz.commands.ExecuteRequest;
 import net.akaritakai.stream.models.quartz.response.ExecuteResponse;
-import net.akaritakai.stream.scheduling.ScriptManagerMBean;
+import net.akaritakai.stream.script.ScriptManagerMBean;
 import net.akaritakai.stream.scheduling.Utils;
 import org.apache.commons.lang3.Validate;
 
