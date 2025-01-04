@@ -35,13 +35,14 @@ import net.akaritakai.stream.handler.stream.StreamStatusHandler;
 import net.akaritakai.stream.handler.telemetry.TelemetryFetchHandler;
 import net.akaritakai.stream.handler.telemetry.TelemetrySendHandler;
 import net.akaritakai.stream.log.DashboardLogAppender;
+import net.akaritakai.stream.scheduling.ScriptManager;
+import net.akaritakai.stream.scheduling.ScriptManagerMBean;
 import net.akaritakai.stream.scheduling.SetupScheduler;
 import net.akaritakai.stream.scheduling.Utils;
 import net.akaritakai.stream.streamer.Streamer;
 import net.akaritakai.stream.streamer.StreamerMBean;
 import net.akaritakai.stream.telemetry.TelemetryStore;
 import net.sourceforge.argparse4j.ArgumentParsers;
-import net.sourceforge.argparse4j.DefaultSettings;
 import net.sourceforge.argparse4j.helper.HelpScreenException;
 import net.sourceforge.argparse4j.impl.Arguments;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
@@ -53,7 +54,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.management.MBeanServer;
-import javax.management.ObjectName;
+import javax.script.Bindings;
+import javax.script.ScriptContext;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import java.io.File;
@@ -62,7 +64,9 @@ import java.net.MalformedURLException;
 import java.nio.channels.ClosedChannelException;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.Predicate;
 
+import static net.akaritakai.stream.config.GlobalNames.*;
 
 public class Main {
 
@@ -110,7 +114,7 @@ public class Main {
         dashboardLogAppender.setOutputStream(DashboardLogAppender.getGlobalOutputStream());
         dashboardLogAppender.start();
 
-        ch.qos.logback.classic.Logger log = logCtx.getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME);
+        ch.qos.logback.classic.Logger log = logCtx.getLogger(ROOT_LOGGER_NAME);
         log.setAdditive(true);
         log.setLevel(Level.INFO);
         //log.addAppender(logConsoleAppender);
@@ -251,6 +255,12 @@ public class Main {
 
         ScriptEngine scriptEngine = new ScriptEngineManager().getEngineByMimeType("application/javascript");
         LOG.info("ScriptEngine: {}", scriptEngine);
+        Bindings bindings = scriptEngine.getBindings(ScriptContext.ENGINE_SCOPE);
+        bindings.put("polyglot.js.allowHostAccess", true);
+        bindings.put("polyglot.js.allowHostClassLookup", (Predicate<String>) s -> {
+            LOG.warn("ScriprEngine class lookup: {}", s);
+            return true;
+        });
         startTimer.touch("ScriptEngine: {}", scriptEngine);
 
         Scheduler scheduler = SetupScheduler.createFactory().getScheduler();
@@ -258,11 +268,12 @@ public class Main {
         startTimer.touch("scheduler created");
         shutdownActions.add(scheduler::shutdown);
 
+        ScriptManager scriptManager = new ScriptManager(scriptEngine);
+        mBeanServer.registerMBean(scriptManager, scriptManagerName);
+        Utils.set(scheduler, ScriptManagerMBean.KEY, scriptManagerName);
+
         CheckAuth auth = new CheckAuthImpl(
                 Optional.ofNullable(ns.getString("apiKey")).orElse(config.getApiKey()));
-
-        ObjectName streamerName = new ObjectName("net.akaritakai.stream:type=Streamer");
-        ObjectName chatManagerName = new ObjectName("net.akaritakai.stream:type=ChatManager");
 
         Vertx vertx = Vertx.vertx().exceptionHandler(ex -> {
             LOG.error("Exception", ex);
@@ -309,14 +320,14 @@ public class Main {
             }).ifPresent(router::handler);
         }
 
-        registerGetHandler("/stream/status", new StreamStatusHandler(vertx, streamerName));
-        registerPostApiHandler("/stream/start", new StartCommandHandler(streamerName, auth, vertx));
-        registerPostApiHandler("/stream/stop", new StopCommandHandler(streamerName, auth));
-        registerPostApiHandler("/stream/pause", new PauseCommandHandler(streamerName, auth, vertx));
-        registerPostApiHandler("/stream/resume", new ResumeCommandHandler(streamerName, auth, vertx));
-        registerPostApiHandler("/stream/dir", new DirCommandHandler(streamerName, auth, vertx));
+        registerGetHandler("/stream/status", new StreamStatusHandler(vertx));
+        registerPostApiHandler("/stream/start", new StartCommandHandler(auth, vertx));
+        registerPostApiHandler("/stream/stop", new StopCommandHandler(auth, vertx));
+        registerPostApiHandler("/stream/pause", new PauseCommandHandler(auth, vertx));
+        registerPostApiHandler("/stream/resume", new ResumeCommandHandler(auth, vertx));
+        registerPostApiHandler("/stream/dir", new DirCommandHandler(auth, vertx));
 
-        new Chat(vertx, router, scheduler, auth, mBeanServer, chatManagerName)
+        new Chat(vertx, router, scheduler, auth, mBeanServer)
                 .addCustomEmojis(Optional.ofNullable(ns.getString("emojisFile")).map(File::new)
                         .orElse(Optional.ofNullable(config.getEmojisFile()).map(File::new).orElse(null)))
                 .install();
@@ -327,6 +338,7 @@ public class Main {
         registerPostApiHandler("/log/fetch", new LogFetchHandler(vertx, auth));
         registerGetHandler("/log", new LogSendHandler());
 
+        registerPostApiHandler("/quartz/execute", new ExecuteHandler(vertx, auth));
         registerPostApiHandler("/quartz/status", new StatusHandler(scheduler, auth));
         registerPostApiHandler("/quartz/standby", new StandbyHandler(scheduler, auth));
         registerPostApiHandler("/quartz/pauseAll", new PauseAllHandler(scheduler, auth));

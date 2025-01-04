@@ -16,7 +16,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <lombok.version>1.18.30</lombok.version>
         <vertx.version>4.5.11</vertx.version>
-        <graalvm.version>22.2.0</graalvm.version>
+        <graalvm.version>24.1.0</graalvm.version>
     </properties>
 
     <dependencies>
@@ -118,16 +118,36 @@
         </dependency>
 
         <dependency>
-            <groupId>org.graalvm.js</groupId>
-            <artifactId>js</artifactId>
+            <groupId>org.graalvm.polyglot</groupId>
+            <artifactId>polyglot</artifactId>
             <version>${graalvm.version}</version>
-            <type>pom</type>
         </dependency>
-
         <dependency>
             <groupId>org.graalvm.js</groupId>
             <artifactId>js-scriptengine</artifactId>
             <version>${graalvm.version}</version>
+        </dependency>
+        <!-- runtime -->
+        <dependency>
+            <groupId>org.graalvm.polyglot</groupId>
+            <artifactId>js-community</artifactId>
+            <version>${graalvm.version}</version>
+            <type>pom</type>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.graalvm.polyglot</groupId>
+            <artifactId>profiler-community</artifactId>
+            <version>${graalvm.version}</version>
+            <type>pom</type>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.graalvm.polyglot</groupId>
+            <artifactId>inspect-community</artifactId>
+            <version>${graalvm.version}</version>
+            <type>pom</type>
+            <scope>runtime</scope>
         </dependency>
 
         <dependency>

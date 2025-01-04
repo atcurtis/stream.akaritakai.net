@@ -4,27 +4,23 @@ import io.vertx.core.Vertx;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.http.HttpServerResponse;
 import net.akaritakai.stream.CheckAuth;
+import net.akaritakai.stream.handler.AbstractBlockingHandler;
 import net.akaritakai.stream.handler.AbstractHandler;
 import net.akaritakai.stream.models.stream.request.StreamResumeRequest;
 import net.akaritakai.stream.scheduling.Utils;
 import net.akaritakai.stream.streamer.StreamerMBean;
 import org.apache.commons.lang3.Validate;
 
-import javax.management.ObjectName;
-import java.util.concurrent.CompletableFuture;
+import static net.akaritakai.stream.config.GlobalNames.streamerName;
 
 
 /**
  * Handles the "POST /stream/resume" command.
  */
-public class ResumeCommandHandler extends AbstractHandler<StreamResumeRequest> {
-  private final Vertx _vertx;
-  private final StreamerMBean _streamer;
+public class ResumeCommandHandler extends AbstractBlockingHandler<StreamResumeRequest> {
 
-  public ResumeCommandHandler(ObjectName streamer, CheckAuth authCheck, Vertx vertx) {
-    super(StreamResumeRequest.class, authCheck);
-    _streamer = Utils.beanProxy(streamer, StreamerMBean.class);
-    _vertx = vertx;
+  public ResumeCommandHandler(CheckAuth authCheck, Vertx vertx) {
+    super(StreamResumeRequest.class, vertx, authCheck);
   }
 
   @Override
@@ -38,19 +34,13 @@ public class ResumeCommandHandler extends AbstractHandler<StreamResumeRequest> {
   }
 
   protected void handleAuthorized(HttpServerRequest httpRequest, StreamResumeRequest request, HttpServerResponse response) {
-    CompletableFuture
-            .completedStage(request)
-            .thenApplyAsync(Utils::writeAsString)
-            .thenAcceptAsync(_streamer::resumeStream)
-                    .whenComplete(((unused, ex) -> {
-                      _vertx.runOnContext(event -> {
-                        if (ex == null) {
-                          handleSuccess(response);
-                        } else {
-                          handleFailure(response, ex);
-                        }
-                      });
-                    }));
+    executeBlocking(() -> {
+      Utils.beanProxy(streamerName, StreamerMBean.class)
+              .resumeStream(request);
+      return null;
+    })
+            .onSuccess(unused -> handleSuccess(response))
+            .onFailure(ex -> handleFailure(response, ex));
   }
 
   private void handleFailure(HttpServerResponse response, Throwable t) {

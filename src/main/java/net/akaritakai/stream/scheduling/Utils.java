@@ -2,7 +2,6 @@ package net.akaritakai.stream.scheduling;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import net.akaritakai.stream.models.stream.request.StreamStartRequest;
 import org.quartz.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

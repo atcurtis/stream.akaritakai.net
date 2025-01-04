@@ -1,7 +1,6 @@
 package net.akaritakai.stream.scheduling;
 
 import net.akaritakai.stream.InitDB;
-import net.akaritakai.stream.Main;
 import net.akaritakai.stream.scheduling.jobs.*;
 import org.quartz.*;
 import org.quartz.impl.StdSchedulerFactory;

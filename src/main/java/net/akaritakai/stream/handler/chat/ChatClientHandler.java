@@ -87,7 +87,7 @@ public class ChatClientHandler implements Handler<RoutingContext> {
         ChatRequest request = OBJECT_MAPPER.readValue(textMessage, ChatRequest.class);
         if (request instanceof ChatJoinRequest) {
           try {
-            ChatStatusResponse status = OBJECT_MAPPER.readValue(_chat.joinChat(OBJECT_MAPPER.writeValueAsString(request)), ChatStatusResponse.class);
+            ChatStatusResponse status = _chat.joinChat((ChatJoinRequest) request);
             String response = OBJECT_MAPPER.writeValueAsString(status);
             socket.writeTextMessage(response);
           } catch (Exception e) {
@@ -99,12 +99,12 @@ public class ChatClientHandler implements Handler<RoutingContext> {
           try {
             validateChatSendRequest((ChatSendRequest) request);
             try {
-              _chat.sendMessage(OBJECT_MAPPER.writeValueAsString(ChatSendRequest.builder()
+              _chat.sendMessage(ChatSendRequest.builder()
                       .messageType(((ChatSendRequest) request).getMessageType())
                       .nickname(((ChatSendRequest) request).getNickname())
                       .message(((ChatSendRequest) request).getMessage())
                       .source(Util.getIpAddressFromRequest(event.request()))
-                      .build()));
+                      .build());
             } catch (Exception e) {
               // This should only occur if the server is not available
               LOG.warn("Unable to send chat message. Reason: {}: {}", e.getClass().getCanonicalName(), e.getMessage());

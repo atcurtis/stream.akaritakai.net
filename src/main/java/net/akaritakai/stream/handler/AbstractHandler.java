@@ -1,5 +1,6 @@
 package net.akaritakai.stream.handler;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Throwables;
 import io.netty.handler.codec.http.HttpResponse;
@@ -9,8 +10,11 @@ import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.http.HttpServerResponse;
 import io.vertx.ext.web.RoutingContext;
 import net.akaritakai.stream.CheckAuth;
+import net.akaritakai.stream.models.stream.StreamEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.CompletionException;
 
 public abstract class AbstractHandler<REQUEST> implements Handler<RoutingContext> {
 
@@ -86,5 +90,13 @@ public abstract class AbstractHandler<REQUEST> implements Handler<RoutingContext
         response.putHeader(HttpHeaders.CONTENT_LENGTH, String.valueOf(message.length()));
         response.putHeader(HttpHeaders.CONTENT_TYPE, contentType);
         response.end(message);
+    }
+
+    protected <E> E readValue(String entry, Class<E> clazz) {
+        try {
+            return OBJECT_MAPPER.readValue(entry, clazz);
+        } catch (JsonProcessingException e) {
+            throw new CompletionException(e);
+        }
     }
 }

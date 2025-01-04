@@ -10,7 +10,6 @@ import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.vertx.core.json.JsonObject;
 import net.akaritakai.stream.exception.ChatStateConflictException;
@@ -18,9 +17,6 @@ import net.akaritakai.stream.handler.Util;
 import net.akaritakai.stream.models.chat.ChatMessage;
 import net.akaritakai.stream.models.chat.ChatMessageType;
 import net.akaritakai.stream.models.chat.ChatSequence;
-import net.akaritakai.stream.models.chat.commands.ChatClearRequest;
-import net.akaritakai.stream.models.chat.commands.ChatDisableRequest;
-import net.akaritakai.stream.models.chat.commands.ChatEnableRequest;
 import net.akaritakai.stream.models.chat.request.ChatJoinRequest;
 import net.akaritakai.stream.models.chat.request.ChatSendRequest;
 import net.akaritakai.stream.models.chat.response.ChatStatusResponse;
@@ -30,6 +26,7 @@ import org.quartz.Scheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import javax.management.AttributeChangeNotification;
 import javax.management.Notification;
 import javax.management.NotificationBroadcasterSupport;
@@ -50,15 +47,7 @@ public class ChatManager extends NotificationBroadcasterSupport implements ChatM
   }
 
   @Override
-  public void sendMessage(String request) {
-    try {
-      sendMessage(OBJECT_MAPPER.readValue(request, ChatSendRequest.class));
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  public void sendMessage(ChatSendRequest request) {
+  public void sendMessage(@Nonnull ChatSendRequest request) {
     LOG.debug("Got ChatSendRequest = {}", request);
     ChatHistory currentHistory = _history.get();
     if (currentHistory == null) {
@@ -108,17 +97,8 @@ public class ChatManager extends NotificationBroadcasterSupport implements ChatM
   }
 
   @Override
-  public void disableChat(String request) {
-    try {
-      disableChat(OBJECT_MAPPER.readValue(request, ChatDisableRequest.class));
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  public void disableChat(ChatDisableRequest request) {
+  public void disableChat() {
     LOG.info("Got ChatDisableRequest");
-    assert request != null;
     ChatHistory currentHistory = _history.get();
     if (currentHistory == null) {
       throw new ChatStateConflictException("Chat is already disabled");
@@ -132,17 +112,8 @@ public class ChatManager extends NotificationBroadcasterSupport implements ChatM
   }
 
   @Override
-  public void enableChat(String request) {
-    try {
-      enableChat(OBJECT_MAPPER.readValue(request, ChatEnableRequest.class));
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  public void enableChat(ChatEnableRequest request) {
+  public void enableChat() {
     LOG.info("Got ChatEnableRequest");
-    assert request != null;
     ChatHistory currentHistory = _history.get();
     if (currentHistory != null) {
       throw new ChatStateConflictException("Chat is already enabled");
@@ -157,17 +128,8 @@ public class ChatManager extends NotificationBroadcasterSupport implements ChatM
   }
 
   @Override
-  public void clearChat(String request) {
-    try {
-      clearChat(OBJECT_MAPPER.readValue(request, ChatClearRequest.class));
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  public void clearChat(ChatClearRequest request) {
+  public void clearChat() {
     LOG.info("Got ChatClearRequest");
-    assert request != null;
     ChatHistory currentHistory = _history.get();
     if (currentHistory == null) {
       throw new ChatStateConflictException("Chat is disabled");
@@ -182,11 +144,7 @@ public class ChatManager extends NotificationBroadcasterSupport implements ChatM
   }
 
   @Override
-  public String joinChat(String request) throws JsonProcessingException {
-    return OBJECT_MAPPER.writeValueAsString(joinChat0(OBJECT_MAPPER.readValue(request, ChatJoinRequest.class)));
-  }
-
-  public ChatStatusResponse joinChat0(ChatJoinRequest request) {
+  public ChatStatusResponse joinChat(@Nonnull ChatJoinRequest request) {
     LOG.info("Got ChatJoinRequest = {}", request);
     ChatHistory history = _history.get();
     if (history == null) {

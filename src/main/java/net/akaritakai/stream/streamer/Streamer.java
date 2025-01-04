@@ -26,16 +26,15 @@ import net.akaritakai.stream.models.stream.StreamEntry;
 import net.akaritakai.stream.models.stream.StreamMetadata;
 import net.akaritakai.stream.models.stream.StreamState;
 import net.akaritakai.stream.models.stream.StreamStateType;
-import net.akaritakai.stream.models.stream.request.StreamPauseRequest;
 import net.akaritakai.stream.models.stream.request.StreamResumeRequest;
 import net.akaritakai.stream.models.stream.request.StreamStartRequest;
-import net.akaritakai.stream.models.stream.request.StreamStopRequest;
 import net.akaritakai.stream.scheduling.Utils;
 import org.quartz.JobDataMap;
 import org.quartz.Scheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import javax.management.AttributeChangeNotification;
 import javax.management.Notification;
 import javax.management.NotificationBroadcasterSupport;
@@ -77,15 +76,7 @@ public class Streamer extends NotificationBroadcasterSupport implements Streamer
   }
 
   @Override
-  public void startStream(String request) {
-    try {
-      startStream(objectMapper.readValue(request, StreamStartRequest.class));
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  public void startStream(StreamStartRequest request) {
+  public void startStream(@Nonnull StreamStartRequest request) {
     LOG.info("Got request to start the stream: {}", request);
     // Ensure that the stream is not already running
     StreamState state = _state.get();
@@ -130,16 +121,9 @@ public class Streamer extends NotificationBroadcasterSupport implements Streamer
     setState(newState);
   }
 
-  public void pauseStream(String request) {
-    try {
-      pauseStream(objectMapper.readValue(request, StreamPauseRequest.class));
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  public void pauseStream(StreamPauseRequest request) {
-    LOG.info("Got request to pause the stream: {}", request);
+  @Override
+  public void pauseStream() {
+    LOG.info("Got request to pause the stream");
     // Ensure that the stream is already running
     StreamState state = _state.get();
     if (state == null || state.getStatus() != StreamStateType.ONLINE) {
@@ -170,15 +154,7 @@ public class Streamer extends NotificationBroadcasterSupport implements Streamer
   }
 
   @Override
-  public void resumeStream(String request) {
-    try {
-      resumeStream(objectMapper.readValue(request, StreamResumeRequest.class));
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  public void resumeStream(StreamResumeRequest request) {
+  public void resumeStream(@Nonnull StreamResumeRequest request) {
     LOG.info("Got request to resume the stream: {}", request);
     // Ensure that the stream is paused
     StreamState state = _state.get();
@@ -213,16 +189,8 @@ public class Streamer extends NotificationBroadcasterSupport implements Streamer
   }
 
   @Override
-  public void stopStream(String request) {
-    try {
-      stopStream(objectMapper.readValue(request, StreamStopRequest.class));
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  public void stopStream(StreamStopRequest request) {
-    LOG.info("Got request to stop the stream: {}", request);
+  public void stopStream() {
+    LOG.info("Got request to stop the stream");
     // Ensure that the stream is not already stopped
     StreamState state = _state.get();
     if (state == null || state.getStatus() == StreamStateType.OFFLINE) {

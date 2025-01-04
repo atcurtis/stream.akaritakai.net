@@ -4,7 +4,6 @@ import net.akaritakai.stream.json.NumberToDurationConverter;
 import net.akaritakai.stream.json.NumberToInstantConverter;
 import net.akaritakai.stream.models.stream.StreamState;
 import net.akaritakai.stream.models.stream.request.StreamStartRequest;
-import net.akaritakai.stream.models.stream.request.StreamStopRequest;
 import net.akaritakai.stream.streamer.StreamerMBean;
 import org.quartz.InterruptableJob;
 import org.quartz.JobExecutionContext;
@@ -47,13 +46,13 @@ public class StreamPlayJob extends AbstractStreamJob implements InterruptableJob
         streamer.addNotificationListener(this, null, handback);
         try {
             countDownLatch = handback.latch;
-            streamer.startStream(writeValueAsString(handback.request));
+            streamer.startStream(handback.request);
             countDownLatch.await();
 
             StreamState state = readValue(streamer.getState(), StreamState.class);
 
             if (handback.request.getName().equals(state.getMediaName())) {
-                streamer.stopStream(writeValueAsString(StreamStopRequest.builder().build()));
+                streamer.stopStream();
             }
         } finally {
             try {

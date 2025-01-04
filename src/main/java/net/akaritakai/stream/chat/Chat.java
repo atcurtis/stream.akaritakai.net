@@ -15,23 +15,23 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.Map;
 
+import static net.akaritakai.stream.config.GlobalNames.*;
+
 public class Chat {
     private final Vertx vertx;
     private final RouterHelper router;
     private final ChatManager chatManager;
     private final CheckAuth checkAuth;
-    private final ObjectName chatManagerName;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public Chat(Vertx vertx, RouterHelper router, Scheduler scheduler, CheckAuth checkAuth,
-                MBeanServer mBeanServer, ObjectName chatManagerName)
+                MBeanServer mBeanServer)
             throws NotCompliantMBeanException, InstanceAlreadyExistsException, MBeanRegistrationException {
         this.vertx = vertx;
         this.router = router;
         this.chatManager = new ChatManager(scheduler);
         this.checkAuth = checkAuth;
-        this.chatManagerName = chatManagerName;
 
         mBeanServer.registerMBean(chatManager, chatManagerName);
         Utils.set(scheduler, ChatManagerMBean.KEY, chatManagerName);

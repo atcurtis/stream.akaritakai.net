@@ -37,6 +37,9 @@ public class ChatHistory {
 
   public ChatMessage addMessage(ChatSendRequest request) {
     ChatMessage message;
+    if (request.getMessageType() == null) {
+      throw new IllegalArgumentException("Malformed request");
+    }
 
     synchronized (this) {
       // Build the message with the next sequence value and append it
