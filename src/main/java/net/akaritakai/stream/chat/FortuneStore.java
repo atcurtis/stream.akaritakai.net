@@ -20,14 +20,7 @@ public class FortuneStore {
     private final Random _random;
 
     public FortuneStore() {
-        _fortuneFiles = new ArrayList<>(List.of(
-                new File("/mnt/u/atcurtis/stream/lessreal"),
-                new File("/mnt/u/atcurtis/stream/grolofs"),
-                new File("/mnt/u/atcurtis/stream/lessreal"),
-                new File("/mnt/u/atcurtis/stream/grolofs"),
-                new File("/mnt/u/atcurtis/stream/grolofs"),
-                new File("/mnt/u/atcurtis/stream/lessreal"),
-                new File("/mnt/u/atcurtis/stream/grolofs")));
+        _fortuneFiles = new ArrayList<>();
         try {
             _random = SecureRandom.getInstanceStrong();
         } catch (NoSuchAlgorithmException e) {

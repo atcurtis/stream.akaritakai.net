@@ -1,10 +1,11 @@
 package net.akaritakai.stream.chat;
 
 import io.vertx.core.json.JsonObject;
-import net.akaritakai.stream.config.GlobalNames;
+import org.quartz.utils.DBConnectionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.sqlite.Function;
+import org.sqlite.SQLiteConnection;
 
 import java.io.Writer;
 import java.sql.*;
@@ -28,6 +29,10 @@ public class EmojiStore {
 
     public static boolean isCustomEmoji(String token) {
         return token.length() > 2 && token.startsWith(":") && token.endsWith(":");
+    }
+
+    private Connection getConnection() throws SQLException {
+        return DBConnectionManager.getInstance().getConnection("myDS");
     }
 
     public synchronized Emoji findCustomEmoji(final String emoji) {
@@ -65,7 +70,7 @@ public class EmojiStore {
                 return null;
             }
             redo = false;
-            try (Connection conn = DriverManager.getConnection(GlobalNames.JDBC_URL);
+            try (Connection conn = getConnection();
                  PreparedStatement stmt = conn.prepareStatement(
                          "SELECT EMOJI_NAME,EMOJI_URL FROM EMOJIS WHERE EMOJI_NAME LIKE ?"
                  )) {
@@ -87,15 +92,15 @@ public class EmojiStore {
                     } while (rs.next());
                 }
             } catch (SQLException ex) {
-                LOG.warn("findCustomEmoji", ex);
+                LOG.warn("findCustomEmoji {}", ref.size() , ex);
             }
         }
     }
 
     public List<Emoji> listEmojis(String regexp, int limit) {
         ArrayList<Emoji> list = new ArrayList<>();
-        try (Connection conn = DriverManager.getConnection(GlobalNames.JDBC_URL)) {
-            Function.create(conn, "REGEXP", new Function() {
+        try (Connection conn = getConnection()) {
+            Function.create(conn.unwrap(SQLiteConnection.class), "REGEXP", new Function() {
                 @Override
                 protected void xFunc() throws SQLException {
                     String expression = value_text(0);
@@ -135,7 +140,7 @@ public class EmojiStore {
                 // no change
                 return;
             }
-            try (Connection conn = DriverManager.getConnection(GlobalNames.JDBC_URL);
+            try (Connection conn = getConnection();
                  PreparedStatement stmt = conn.prepareStatement("REPLACE INTO EMOJIS VALUES (?,?) ")) {
                 stmt.setString(1, key);
                 stmt.setString(2, url);
@@ -149,7 +154,7 @@ public class EmojiStore {
     }
 
     public void exportTo(Writer out) {
-        try (Connection conn = DriverManager.getConnection(GlobalNames.JDBC_URL);
+        try (Connection conn = getConnection();
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery("SELECT EMOJI_NAME,EMOJI_URL FROM EMOJIS")) {
             out.write("{\n");
