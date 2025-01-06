@@ -11,7 +11,7 @@ Build Instructions
 
 Runtime Dependencies
 --------------------
-The `JAVA_HOME` environment variable should point to a Java 11 JRE or JDK.
+The `JAVA_HOME` environment variable should point to a Java 17 JRE or JDK.
 
 Credits
 -------

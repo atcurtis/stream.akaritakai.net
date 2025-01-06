@@ -1,5 +1,8 @@
 <template>
-  <log-viewer v-if="!needApiKey" :log="log"/>
+  <b-form  v-if="!needApiKey" @submit.stop.prevent="alwaysTrue">
+    <button type="submit" class="btn btn-primary" @click="doClearLog">Clear Log</button>
+    <log-viewer :log="log"/>
+  </b-form>
 </template>
 
 <script>
@@ -65,6 +68,12 @@
       establishLogListener();
     },
     methods: {
+      alwaysTrue() {
+        return true;
+      },
+      doClearLog() {
+        this.log = ''
+      },
       showResult(successValue, messageValue) {
         this.$emit("showResult", {
           message: messageValue,

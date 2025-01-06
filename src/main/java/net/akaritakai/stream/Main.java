@@ -31,6 +31,7 @@ import net.akaritakai.stream.handler.info.LogSendHandler;
 import net.akaritakai.stream.handler.telemetry.TelemetryFetchHandler;
 import net.akaritakai.stream.handler.telemetry.TelemetrySendHandler;
 import net.akaritakai.stream.log.DashboardLogAppender;
+import net.akaritakai.stream.net.DataUrlStreamHandlerFactory;
 import net.akaritakai.stream.scheduling.ScheduleManager;
 import net.akaritakai.stream.script.ScriptManager;
 import net.akaritakai.stream.streamer.Streamer;
@@ -59,6 +60,8 @@ public class Main {
 
     private static final Logger LOG;
     static {
+        DataUrlStreamHandlerFactory.register();
+
         File cfg = new File("logback.xml");
         if (cfg.exists() && System.getProperty("logback.configurationFile") == null) {
             System.setProperty("logback.configurationFile", cfg.getAbsolutePath());

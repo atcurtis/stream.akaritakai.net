@@ -2,18 +2,32 @@ package net.akaritakai.stream;
 
 import net.akaritakai.stream.config.GlobalNames;
 
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.Statement;
+import java.sql.*;
+import java.util.HashSet;
+import java.util.Set;
 
 public class InitDB {
-    public static void main(String[] args) throws Exception{
+    public static void main(String[] args) throws Exception {
         // create a database connection
-        Connection connection = DriverManager.getConnection(GlobalNames.JDBC_URL);
-        Statement statement = connection.createStatement();
+        try (Connection connection = DriverManager.getConnection(GlobalNames.JDBC_URL);
+             Statement statement = connection.createStatement()) {
+            initDB(statement);
+        }
+    }
+
+    public static void initDB(Statement statement) throws SQLException {
+
         statement.setQueryTimeout(30);  // set timeout to 30 sec.
 
-        statement.executeUpdate(
+        Set<String> names = new HashSet<>();
+
+        try (ResultSet rs = statement.executeQuery("SELECT name FROM sqlite_master WHERE type='table'")) {
+            while (rs.next()) {
+                names.add(rs.getString(1).toUpperCase());
+            }
+        }
+
+        if (!names.contains("QRTZ_JOB_DETAILS")) statement.executeUpdate(
                         "CREATE TABLE QRTZ_JOB_DETAILS\n" +
                         "  (\n" +
                         "    SCHED_NAME VARCHAR(120) NOT NULL,\n" +
@@ -29,7 +43,7 @@ public class InitDB {
                         "    PRIMARY KEY (SCHED_NAME,JOB_NAME,JOB_GROUP)\n" +
                         ")");
 
-        statement.executeUpdate(
+        if (!names.contains("QRTZ_TRIGGERS")) statement.executeUpdate(
                 "CREATE TABLE QRTZ_TRIGGERS\n" +
                         "  (\n" +
                         "    SCHED_NAME VARCHAR(120) NOT NULL,\n" +
@@ -53,7 +67,7 @@ public class InitDB {
                         "        REFERENCES QRTZ_JOB_DETAILS(SCHED_NAME,JOB_NAME,JOB_GROUP)\n" +
                         ")");
 
-        statement.executeUpdate(
+        if (!names.contains("QRTZ_SIMPLE_TRIGGERS")) statement.executeUpdate(
                         "CREATE TABLE QRTZ_SIMPLE_TRIGGERS\n" +
                         "  (\n" +
                         "    SCHED_NAME VARCHAR(120) NOT NULL,\n" +
@@ -67,7 +81,7 @@ public class InitDB {
                         "        REFERENCES QRTZ_TRIGGERS(SCHED_NAME,TRIGGER_NAME,TRIGGER_GROUP)\n" +
                         ")");
 
-        statement.executeUpdate(
+        if (!names.contains("QRTZ_CRON_TRIGGERS")) statement.executeUpdate(
                         "CREATE TABLE QRTZ_CRON_TRIGGERS\n" +
                         "  (\n" +
                         "    SCHED_NAME VARCHAR(120) NOT NULL,\n" +
@@ -80,7 +94,7 @@ public class InitDB {
                         "        REFERENCES QRTZ_TRIGGERS(SCHED_NAME,TRIGGER_NAME,TRIGGER_GROUP)\n" +
                         ")");
 
-        statement.executeUpdate(
+        if (!names.contains("QRTZ_SIMPROP_TRIGGERS")) statement.executeUpdate(
                 "CREATE TABLE QRTZ_SIMPROP_TRIGGERS\n" +
                 "  (          \n" +
                 "    SCHED_NAME VARCHAR(120) NOT NULL,\n" +
@@ -102,7 +116,7 @@ public class InitDB {
                 "    REFERENCES QRTZ_TRIGGERS(SCHED_NAME,TRIGGER_NAME,TRIGGER_GROUP)\n" +
                 ")");
 
-        statement.executeUpdate(
+        if (!names.contains("QRTZ_BLOB_TRIGGERS")) statement.executeUpdate(
                         "CREATE TABLE QRTZ_BLOB_TRIGGERS\n" +
                         "  (\n" +
                         "    SCHED_NAME VARCHAR(120) NOT NULL,\n" +
@@ -114,7 +128,7 @@ public class InitDB {
                         "        REFERENCES QRTZ_TRIGGERS(SCHED_NAME,TRIGGER_NAME,TRIGGER_GROUP)\n" +
                         ")");
 
-        statement.executeUpdate(
+        if (!names.contains("QRTZ_CALENDARS")) statement.executeUpdate(
                         "CREATE TABLE QRTZ_CALENDARS\n" +
                         "  (\n" +
                         "    SCHED_NAME VARCHAR(120) NOT NULL,\n" +
@@ -123,7 +137,7 @@ public class InitDB {
                         "    PRIMARY KEY (SCHED_NAME,CALENDAR_NAME)\n" +
                         ")");
 
-        statement.executeUpdate(
+        if (!names.contains("QRTZ_PAUSED_TRIGGER_GRPS")) statement.executeUpdate(
                         "CREATE TABLE QRTZ_PAUSED_TRIGGER_GRPS\n" +
                         "  (\n" +
                         "    SCHED_NAME VARCHAR(120) NOT NULL,\n" +
@@ -131,7 +145,7 @@ public class InitDB {
                         "    PRIMARY KEY (SCHED_NAME,TRIGGER_GROUP)\n" +
                         ")");
 
-        statement.executeUpdate(
+        if (!names.contains("QRTZ_FIRED_TRIGGERS")) statement.executeUpdate(
                 "CREATE TABLE QRTZ_FIRED_TRIGGERS\n" +
                         "  (\n" +
                         "    SCHED_NAME VARCHAR(120) NOT NULL,\n" +
@@ -150,7 +164,7 @@ public class InitDB {
                         "    PRIMARY KEY (SCHED_NAME,ENTRY_ID)\n" +
                         ")");
 
-        statement.executeUpdate(
+        if (!names.contains("QRTZ_SCHEDULER_STATE")) statement.executeUpdate(
                         "CREATE TABLE QRTZ_SCHEDULER_STATE\n" +
                         "  (\n" +
                         "    SCHED_NAME VARCHAR(120) NOT NULL,\n" +
@@ -160,7 +174,7 @@ public class InitDB {
                         "    PRIMARY KEY (SCHED_NAME,INSTANCE_NAME)\n" +
                         ")");
 
-        statement.executeUpdate("\n" +
+        if (!names.contains("QRTZ_LOCKS")) statement.executeUpdate("\n" +
                 "CREATE TABLE QRTZ_LOCKS\n" +
                 "  (\n" +
                 "    SCHED_NAME VARCHAR(120) NOT NULL,\n" +
@@ -168,7 +182,7 @@ public class InitDB {
                 "    PRIMARY KEY (SCHED_NAME,LOCK_NAME)\n" +
                 ")");
 
-        statement.executeUpdate("\n" +
+        if (!names.contains("EMOJIS")) statement.executeUpdate("\n" +
                 "CREATE TABLE EMOJIS\n" +
                 "  (\n" +
                 "    EMOJI_NAME VARCHAR(40) NOT NULL,\n" +
@@ -176,6 +190,5 @@ public class InitDB {
                 "    PRIMARY KEY (EMOJI_NAME)\n" +
                 ")");
 
-        connection.close();
     }
 }

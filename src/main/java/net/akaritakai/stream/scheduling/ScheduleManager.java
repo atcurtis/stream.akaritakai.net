@@ -25,11 +25,9 @@ import org.slf4j.LoggerFactory;
 import org.sqlite.JDBC;
 
 import javax.management.NotificationBroadcasterSupport;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.*;
+import java.util.Date;
 import java.util.stream.Collectors;
 
 import static net.akaritakai.stream.config.GlobalNames.*;
@@ -61,12 +59,8 @@ public class ScheduleManager extends NotificationBroadcasterSupport implements S
         schedulerProperties.setProperty("org.quartz.scheduler.jmx.objectName", "net.akaritakai.stream:type=Scheduler");
 
         try (Connection connection = DriverManager.getConnection(schedulerProperties.getProperty("org.quartz.dataSource.myDS.URL"));
-             ResultSet rs = connection.createStatement().executeQuery("SELECT COUNT(*) FROM QRTZ_LOCKS")) {
-            rs.next();
-            LOG.info("Database already initialized");
-        } catch (SQLException ex) {
-            LOG.warn("Attempting to reinitialize the database");
-            InitDB.main(new String[0]);
+             Statement statement = connection.createStatement()) {
+            InitDB.initDB(statement);
         }
 
         schedulerFactory.initialize(schedulerProperties);
