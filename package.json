@@ -15,7 +15,7 @@
     "axios": "^1.7.9",
     "bootstrap": "^4.6.2",
     "bootstrap-vue": "^2.23.1",
-    "emoji-js": "^3.8.0",
+    "emoji-js": "^3.8.1",
     "emoticon": "^4.1.0",
     "hls.js": "^1.5.18",
     "js-tabs": "^1.0.1",
