@@ -182,7 +182,7 @@ public class ScheduleManager extends NotificationBroadcasterSupport implements S
                 .description(detail.getDescription())
                 .durable(detail.isDurable())
                 .persist(detail.isPersistJobDataAfterExecution())
-                .concurrent(!detail.isConcurrentExectionDisallowed())
+                .concurrent(!detail.isConcurrentExecutionDisallowed())
                 .recoverable(detail.requestsRecovery())
                 .build();
     }
