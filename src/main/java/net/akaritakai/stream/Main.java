@@ -19,6 +19,8 @@ import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.FileSystemAccess;
 import io.vertx.ext.web.handler.StaticHandler;
 import net.akaritakai.stream.chat.ChatManager;
+import net.akaritakai.stream.chat.EmojiStore;
+import net.akaritakai.stream.chat.FortuneStore;
 import net.akaritakai.stream.config.Config;
 import net.akaritakai.stream.config.ConfigData;
 import net.akaritakai.stream.config.ShutdownAction;
@@ -29,6 +31,7 @@ import net.akaritakai.stream.handler.info.LogSendHandler;
 import net.akaritakai.stream.handler.telemetry.TelemetryFetchHandler;
 import net.akaritakai.stream.handler.telemetry.TelemetrySendHandler;
 import net.akaritakai.stream.log.DashboardLogAppender;
+import net.akaritakai.stream.net.DataUrlStreamHandlerFactory;
 import net.akaritakai.stream.scheduling.ScheduleManager;
 import net.akaritakai.stream.script.ScriptManager;
 import net.akaritakai.stream.streamer.Streamer;
@@ -57,6 +60,8 @@ public class Main {
 
     private static final Logger LOG;
     static {
+        DataUrlStreamHandlerFactory.register();
+
         File cfg = new File("logback.xml");
         if (cfg.exists() && System.getProperty("logback.configurationFile") == null) {
             System.setProperty("logback.configurationFile", cfg.getAbsolutePath());
@@ -254,12 +259,22 @@ public class Main {
         shutdownActions.add(() -> vertx.close().toCompletionStage().toCompletableFuture().join());
 
         TelemetryStore telemetryStore = new TelemetryStore();
+        mBeanServer.registerMBean(telemetryStore, telemetryStoreName);
 
         Streamer streamer = new Streamer(vertx, config);
         mBeanServer.registerMBean(streamer, streamerName);
         startTimer.touch("streamer created");
 
-        ChatManager chatManager = new ChatManager(startTimer, config);
+        EmojiStore emojiStore = new EmojiStore();
+        FortuneStore fortuneStore = new FortuneStore();
+
+        if (config.getFortuneFiles() != null) {
+            for (String f : config.getFortuneFiles()) {
+                fortuneStore.addFile(new File(f));
+            }
+        }
+
+        ChatManager chatManager = new ChatManager(startTimer, emojiStore, fortuneStore, config);
         mBeanServer.registerMBean(chatManager, chatManagerName);
         startTimer.touch("Chat manager created");
 

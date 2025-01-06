@@ -10,7 +10,7 @@ import com.google.common.cache.CacheBuilder;
 import net.akaritakai.stream.models.telemetry.TelemetryEvent;
 
 
-public class TelemetryStore {
+public class TelemetryStore implements TelemetryStoreMBean {
   private static final int MAX_NUMBER_OF_USERS = 1000;
   private static final Duration MAX_USER_TTL = Duration.ofMinutes(1);
 
@@ -21,6 +21,11 @@ public class TelemetryStore {
 
   public Collection<TelemetryEvent> getTelemetry() {
     return Collections.unmodifiableCollection(_cache.asMap().values());
+  }
+
+  @Override
+  public long size() {
+    return _cache.size();
   }
 
   public void storeEvent(TelemetryEvent event) {
