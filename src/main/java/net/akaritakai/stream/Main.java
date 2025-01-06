@@ -20,6 +20,7 @@ import io.vertx.ext.web.handler.FileSystemAccess;
 import io.vertx.ext.web.handler.StaticHandler;
 import net.akaritakai.stream.chat.ChatManager;
 import net.akaritakai.stream.chat.EmojiStore;
+import net.akaritakai.stream.chat.FortuneStore;
 import net.akaritakai.stream.config.Config;
 import net.akaritakai.stream.config.ConfigData;
 import net.akaritakai.stream.config.ShutdownAction;
@@ -262,7 +263,15 @@ public class Main {
         startTimer.touch("streamer created");
 
         EmojiStore emojiStore = new EmojiStore();
-        ChatManager chatManager = new ChatManager(startTimer, emojiStore, config);
+        FortuneStore fortuneStore = new FortuneStore();
+
+        if (config.getFortuneFiles() != null) {
+            for (String f : config.getFortuneFiles()) {
+                fortuneStore.addFile(new File(f));
+            }
+        }
+
+        ChatManager chatManager = new ChatManager(startTimer, emojiStore, fortuneStore, config);
         mBeanServer.registerMBean(chatManager, chatManagerName);
         startTimer.touch("Chat manager created");
 

@@ -52,9 +52,9 @@ public class ChatManager extends NotificationBroadcasterSupport implements ChatM
 
   private final AtomicInteger _sequenceNumber = new AtomicInteger();
 
-  public ChatManager(TouchTimer startTimer, EmojiStore emojiStore, ConfigData config) {
+  public ChatManager(TouchTimer startTimer, EmojiStore emojiStore, FortuneStore fortuneStore, ConfigData config) {
     _emojiStore = emojiStore;
-      _fortunes = new FortuneStore();
+    _fortunes = fortuneStore;
   }
 
   public static void register(Vertx vertx, RouterHelper router, CheckAuth checkAuth, ObjectName chatManagerName) {
