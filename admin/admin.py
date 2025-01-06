@@ -64,6 +64,13 @@ class Chat():
     nick = self.args.COMMAND[2]
     msg = " ".join(self.args.COMMAND[3:])
     print(requests.post(uri(self.args, 'chat/write'), data=json.dumps({'key':self.args.apiKey,'messageType':'TEXT','nickname':nick,'message':msg}), headers={'content-type':'application/json'}))
+  def cmd(self):
+    if len(self.args.COMMAND) < 4:
+      print("missing nick and command")
+      return
+    nick = self.args.COMMAND[2]
+    msg = " ".join(self.args.COMMAND[3:])
+    print(requests.post(uri(self.args, 'chat/cmd'), data=json.dumps({'key':self.args.apiKey,'messageType':'TEXT','nickname':nick,'message':msg}), headers={'content-type':'application/json'}))
   def setemoji(self):
     if len(self.args.COMMAND) != 4:
       print("missing name and url")

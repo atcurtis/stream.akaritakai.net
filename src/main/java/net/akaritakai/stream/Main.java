@@ -23,6 +23,7 @@ import net.akaritakai.stream.chat.EmojiStore;
 import net.akaritakai.stream.chat.FortuneStore;
 import net.akaritakai.stream.config.Config;
 import net.akaritakai.stream.config.ConfigData;
+import net.akaritakai.stream.config.Options;
 import net.akaritakai.stream.config.ShutdownAction;
 import net.akaritakai.stream.debug.TouchTimer;
 import net.akaritakai.stream.handler.*;
@@ -39,9 +40,7 @@ import net.akaritakai.stream.telemetry.TelemetryStore;
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.helper.HelpScreenException;
 import net.sourceforge.argparse4j.impl.Arguments;
-import net.sourceforge.argparse4j.inf.ArgumentParser;
-import net.sourceforge.argparse4j.inf.ArgumentParserException;
-import net.sourceforge.argparse4j.inf.Namespace;
+import net.sourceforge.argparse4j.inf.*;
 import org.quartz.SchedulerException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,8 +48,11 @@ import org.slf4j.LoggerFactory;
 import javax.management.MBeanServer;
 import java.io.File;
 import java.lang.management.ManagementFactory;
+import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.nio.channels.ClosedChannelException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -71,11 +73,17 @@ public class Main {
 
     private final String version = getClass().getPackage().getImplementationVersion();
     private RouterHelper router;
-    private boolean sslApi;
-    private boolean sslMedia;
     private int exitCode = 1;
     private Executor shutdownExecutor = Runnable::run;
+    private final Options opt = new Options();
 
+    private enum Command {
+        RUN,
+        STREAM_START, STREAM_STOP, STREAM_PAUSE, STREAM_RESUME,
+        CHAT_CLEAR, CHAT_ENABLE, CHAT_DISABLE, CHAT_WRITE, CHAT_CMD, CHAT_SETEMOJI,
+        HEALTH,
+        TIME,
+    }
 
     private Main() {
         LoggerContext logCtx = (LoggerContext) LoggerFactory.getILoggerFactory();
@@ -111,7 +119,7 @@ public class Main {
         log.addAppender(dashboardLogAppender);
     }
 
-    private Namespace handleArguments(String[] args) {
+    private void handleArguments(String[] args) {
         ArgumentParser argumentParser = ArgumentParsers.newFor("StreamServer")
                 .addHelp(true)
                 .terminalWidthDetection(true)
@@ -126,7 +134,9 @@ public class Main {
         argumentParser.addArgument("-f", "--configFile")
                 .dest("configFile")
                 .help("Configuration file")
-                .metavar("FILE");
+                .metavar("FILE")
+                .type(File.class)
+                .action(new LoadConfig());
         argumentParser.addArgument("-p", "--port")
                 .dest("port")
                 .help("Service TCP port number")
@@ -146,49 +156,97 @@ public class Main {
                 .dest("sslApi")
                 .type(Boolean.class)
                 .help("API Configuration requires SSL");
-        argumentParser.addArgument("--sslMedia")
+        argumentParser.addArgument("--delay").dest("delay").type(Duration.class).help(FeatureControl.SUPPRESS);
+        argumentParser.addArgument("--seekTime").dest("seekTime").type(Duration.class).help(FeatureControl.SUPPRESS);
+        argumentParser.addArgument("--startAt").dest("startAt").type(Instant.class).help(FeatureControl.SUPPRESS);
+        argumentParser.addArgument("--host").dest("host").setDefault("localhost").help(FeatureControl.SUPPRESS);
+        Subparsers subparsers = argumentParser.addSubparsers().metavar("COMMAND");
+        Subparser run = subparsers.addParser("run").setDefault("command", Command.RUN)
+                .description("Start the server");
+        run.addArgument("--sslMedia")
                 .dest("sslMedia")
                 .type(Boolean.class)
                 .setDefault(false)
                 .help("Media available on SSL");
-        argumentParser.addArgument("--emojisFile")
+        run.addArgument("--emojisFile")
                 .dest("emojisFile")
                 .help("Custom emojis json file")
                 .metavar("FILE");
+        Subparsers stream = subparsers.addParser("stream").description("Stream Operations").addSubparsers().dest("subcommand");
+        Subparser p = stream.addParser("start").setDefault("command", Command.STREAM_START)
+                .description("Start the stream");
+        p.addArgument("--delay").dest("delay").type(Duration.class);
+        p.addArgument("--seekTime").dest("seekTime").type(Duration.class);
+        p.addArgument("--startAt").dest("startAt").type(Instant.class);
+        p.addArgument("video-name").dest("video");
+
+        stream.addParser("stop").setDefault("command", Command.STREAM_STOP)
+                .description("Stop the stream");
+        stream.addParser("pause").setDefault("command", Command.STREAM_PAUSE)
+                .description("Pause the stream");
+        p = stream.addParser("resume").setDefault("command", Command.STREAM_RESUME)
+                .description("Resume the stream");
+        p.addArgument("--delay").dest("delay").type(Duration.class);
+        p.addArgument("--seekTime").dest("seekTime").type(Duration.class);
+        p.addArgument("--startAt").dest("startAt").type(Instant.class);
+
+        Subparsers chat = subparsers.addParser("chat").description("Chat/Interactive Operations").addSubparsers();
+        chat.addParser("clear").setDefault("command", Command.CHAT_CLEAR)
+                .description("Clear the chat history");
+        chat.addParser("enable").setDefault("command", Command.CHAT_ENABLE)
+                .description("Enable chat");
+        chat.addParser("disable").setDefault("command", Command.CHAT_DISABLE)
+                .description("Disable chat");
+        p = chat.addParser("write").setDefault("command", Command.CHAT_WRITE);
+        p.addArgument("nickname").dest("nickname");
+        p.addArgument("TEXT").nargs("+").dest("text");
+        p = chat.addParser("cmd").setDefault("command", Command.CHAT_CMD);
+        p.addArgument("nickname").dest("nickname");
+        p.addArgument("TEXT").nargs("+").dest("text");
+        p = chat.addParser("setemoji").setDefault("command", Command.CHAT_SETEMOJI);
+        p.addArgument("emoji-name").dest("nickname");
+        p.addArgument("emoji-value").dest("emoji");
+        subparsers.addParser("health").setDefault("command", Command.HEALTH);
+        subparsers.addParser("time").setDefault("command", Command.TIME);
         try {
-            return argumentParser.parseArgs(args);
+            argumentParser.parseArgs(args, this.opt);
         } catch (ArgumentParserException e) {
             argumentParser.handleError(e);
             System.exit(e instanceof HelpScreenException ? 0 : 1);
-            return null;
         }
     }
 
-    private ConfigData loadConfig(Namespace ns) {
-        return Config.getConfig(Optional
-                .ofNullable(ns.getString("configFile"))
-                .map(File::new)
-                .filter(file -> {
-                    if (file.isFile() && file.canRead()) {
-                        return true;
-                    } else {
-                        LOG.error("File not found or not readable: {}", file);
-                        return false;
-                    }
-                }).map(file -> {
-                    try {
-                        return file.toURI().toURL();
-                    } catch (MalformedURLException e) {
-                        LOG.error("Unexpected exception", e);
-                        throw new RuntimeException(e);
-                    }
-                }).orElse(null));
+    private static class LoadConfig implements ArgumentAction {
+        @Override
+        public void run(ArgumentParser parser, Argument arg, Map<String, Object> attrs, String flag, Object value) throws ArgumentParserException {
+            try {
+                if (!(value instanceof File file)) {
+                    throw new ArgumentParserException("Expected file", parser);
+                }
+                if (!file.isFile() || !file.canRead()) {
+                    LOG.error("File not found or not readable: {}", file);
+                    throw new ArgumentParserException("File not found", parser);
+                }
+                attrs.put(arg.getDest(), Config.getConfig(file.toURI().toURL()));
+            } catch (MalformedURLException e) {
+                throw new ArgumentParserException(e, parser);
+            }
+        }
+
+        @Override
+        public void onAttach(Argument arg) {
+        }
+
+        @Override
+        public boolean consumeArgument() {
+            return true;
+        }
     }
 
     public static void main(String[] args) throws Exception {
         TouchTimer startTimer = new TouchTimer();
         Main main = new Main();
-        Namespace ns = main.handleArguments(args);
+        main.handleArguments(args);
         CompletableFuture<Void> shutdown = new CompletableFuture<>();
         CountDownLatch shutdownLatch = new CountDownLatch(1);
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -222,21 +280,58 @@ public class Main {
             });
         });
         try {
-            main.main0(startTimer, ns, shutdown, shutdownActions);
+            if (main.opt.config == null) {
+                main.opt.config = ConfigData.builder().build();
+            }
+            if (main.opt.apiKey == null) {
+                main.opt.apiKey = main.opt.config.getApiKey();
+            }
+            if (main.opt.port == null) {
+                main.opt.port = main.opt.config.getPort();
+            }
+            if (main.opt.sslPort == null) {
+                main.opt.port = main.opt.config.getSslPort();
+            }
+            if (main.opt.emojisFile == null && main.opt.config.getEmojisFile() != null) {
+                main.opt.emojisFile = new File(main.opt.config.getEmojisFile());
+            }
+            main.select(startTimer, shutdown, shutdownActions);
         } catch (Exception ex) {
             shutdown.completeExceptionally(ex);
         }
     }
 
-    private void main0(TouchTimer startTimer, Namespace ns,
+    private void select(TouchTimer startTimer,
+                        CompletableFuture<Void> shutdown, Stack<ShutdownAction> shutdownActions) throws Exception {
+        switch ((Command) opt.command) {
+            case RUN -> main0(startTimer, shutdown, shutdownActions);
+            default -> {
+                String name = opt.command.toString();
+                int i = name.indexOf("_");
+                if (i < 0) {
+                    i = name.length();
+                }
+                String clsName = name.substring(0, 1) + name.substring(1, i).toLowerCase(Locale.US);
+                String methodName = "run";
+                if (i < name.length()) {
+                    methodName = name.substring(i + 1).toLowerCase();
+                }
+
+                Class<?> cls = Class.forName(getClass().getPackageName() + ".admin." + clsName);
+                Method method = cls.getMethod(methodName);
+
+                Object rc = method.invoke(cls.getConstructor(TouchTimer.class, Options.class, CompletableFuture.class, Stack.class)
+                        .newInstance(startTimer, opt, shutdown, shutdownActions));
+
+                exitCode = rc == null ? 0 : rc instanceof Number num ? num.intValue() : -1;
+                shutdown.complete(null);
+            }
+        }
+    }
+
+    private void main0(TouchTimer startTimer,
                       CompletableFuture<Void> shutdown, Stack<ShutdownAction> shutdownActions) throws Exception {
-
-        sslApi = Optional.ofNullable(ns.getBoolean("sslApi")).orElse(false);
-        sslMedia = Optional.ofNullable(ns.getBoolean("sslMedia")).orElse(false);
-
-        ConfigData config = loadConfig(ns);
-        LOG.info("Loaded config {}", config);
-        startTimer.touch("Loaded config");
+        final ConfigData config = opt.config;
 
         MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
 
@@ -249,8 +344,7 @@ public class Main {
         ScheduleManager scheduleManager = new ScheduleManager(startTimer);
         mBeanServer.registerMBean(scheduleManager, scheduleManagerName);
 
-        CheckAuth auth = new CheckAuthImpl(
-                Optional.ofNullable(ns.getString("apiKey")).orElse(config.getApiKey()));
+        CheckAuth auth = new CheckAuthImpl(opt.apiKey);
 
         Vertx vertx = Vertx.vertx().exceptionHandler(ex -> {
             LOG.error("Exception", ex);
@@ -268,22 +362,20 @@ public class Main {
         EmojiStore emojiStore = new EmojiStore();
         FortuneStore fortuneStore = new FortuneStore();
 
-        if (config.getFortuneFiles() != null) {
-            for (String f : config.getFortuneFiles()) {
-                fortuneStore.addFile(new File(f));
-            }
+        for (String f : Optional.ofNullable(config.getFortuneFiles()).map(Arrays::asList)
+                .orElse(Collections.emptyList())) {
+            fortuneStore.addFile(new File(f));
         }
 
         ChatManager chatManager = new ChatManager(startTimer, emojiStore, fortuneStore, config);
         mBeanServer.registerMBean(chatManager, chatManagerName);
         startTimer.touch("Chat manager created");
 
-        chatManager.addCustomEmojis(Optional.ofNullable(ns.getString("emojisFile")).map(File::new)
-                        .orElse(Optional.ofNullable(config.getEmojisFile()).map(File::new).orElse(null)));
+        chatManager.addCustomEmojis(opt.emojisFile);
         startTimer.touch("after loading custom emojis");
 
         /* Now to setup the vertx router */
-        router = new RouterHelper(vertx, sslApi);
+        router = new RouterHelper(vertx, opt.isSslApi());
 
         Optional.of((Handler<RoutingContext>) event -> {
             TouchTimer.of(event).ifPresent(touchTimer -> touchTimer.touch("failureHandler"));
@@ -368,8 +460,8 @@ public class Main {
                         .setEnableFSTuning(true)
                         .setEnableRangeSupport(true)).ifPresent(handler -> {
                     router.router.route("/media/*").handler(handler);
-                    LOG.info("sslMedia = {}", sslMedia);
-                    router.sslRouter.route("/media/*").handler(sslMedia ? handler : new RedirectHandler(() -> httpPort[0]));
+                    LOG.info("sslMedia = {}", opt.isSslMedia());
+                    router.sslRouter.route("/media/*").handler(opt.isSslMedia() ? handler : new RedirectHandler(() -> httpPort[0]));
                 });
             } else {
                 LOG.warn("Media directory not found or not readable: {}", config.getMediaRootDir());
@@ -400,7 +492,7 @@ public class Main {
         startTimer.touch("createHttpServer");
         HttpServer httpServer = vertx.createHttpServer(httpServerOptions)
                 .requestHandler(router.router)
-                .listen(Optional.ofNullable(ns.getInt("port")).orElse(config.getPort()), bind, event -> {
+                .listen(opt.port, bind, event -> {
                     if (event.succeeded()) {
                         startTimer.touch("http:listen done, port {}", event.result().actualPort());
                         LOG.info("Started the http server on port {}", event.result().actualPort());
@@ -417,7 +509,7 @@ public class Main {
         startTimer.touch("createHttpsServer");
         HttpServer httpsServer = vertx.createHttpServer(httpsServerOptions)
                 .requestHandler(router.sslRouter)
-                .listen(Optional.ofNullable(ns.getInt("sslPort")).orElse(config.getSslPort()), bind, event -> {
+                .listen(opt.sslPort, bind, event -> {
                     if (event.succeeded()) {
                         startTimer.touch("https:listen done, port {}", event.result().actualPort());
                         LOG.info("Started the https server on port {}", event.result().actualPort());
@@ -445,6 +537,13 @@ public class Main {
                     exitCode = 0;
                 })
                 .onFailure(shutdown::completeExceptionally);
+
+        try {
+            LOG.info("Wait for shutdown");
+            shutdown.join();
+        } finally {
+            LOG.info("Shutdown triggered");
+        }
     }
 
     private void registerGetHandler(String uri, Handler<RoutingContext> handler) {
