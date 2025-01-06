@@ -17,7 +17,7 @@
         <lombok.version>1.18.30</lombok.version>
         <vertx.version>4.5.11</vertx.version>
         <graalvm.version>24.1.0</graalvm.version>
-        <logback.version>1.5.13</logback.version>
+        <logback.version>1.5.16</logback.version>
     </properties>
 
     <dependencies>
