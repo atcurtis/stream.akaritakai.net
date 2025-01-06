@@ -7,7 +7,6 @@ import io.vertx.core.http.HttpServerResponse;
 import net.akaritakai.stream.CheckAuth;
 import net.akaritakai.stream.exception.StreamStateConflictException;
 import net.akaritakai.stream.handler.AbstractBlockingHandler;
-import net.akaritakai.stream.handler.AbstractHandler;
 import net.akaritakai.stream.models.stream.request.StreamStartRequest;
 import net.akaritakai.stream.scheduling.Utils;
 import net.akaritakai.stream.streamer.StreamerMBean;

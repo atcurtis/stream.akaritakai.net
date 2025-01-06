@@ -2,7 +2,6 @@ package net.akaritakai.stream.handler.telemetry;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.vertx.core.Handler;
-import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.http.ServerWebSocket;
 import io.vertx.ext.web.RoutingContext;
 import net.akaritakai.stream.handler.Util;
@@ -10,8 +9,6 @@ import net.akaritakai.stream.models.telemetry.TelemetryEvent;
 import net.akaritakai.stream.models.telemetry.TelemetryEventRequest;
 import net.akaritakai.stream.telemetry.TelemetryStore;
 import org.apache.commons.lang3.Validate;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.net.InetAddress;
 
