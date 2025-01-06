@@ -537,6 +537,13 @@ public class Main {
                     exitCode = 0;
                 })
                 .onFailure(shutdown::completeExceptionally);
+
+        try {
+            LOG.info("Wait for shutdown");
+            shutdown.join();
+        } finally {
+            LOG.info("Shutdown triggered");
+        }
     }
 
     private void registerGetHandler(String uri, Handler<RoutingContext> handler) {
