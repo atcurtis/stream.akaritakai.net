@@ -292,6 +292,9 @@ public class Main {
             if (main.opt.sslPort == null) {
                 main.opt.port = main.opt.config.getSslPort();
             }
+            if (main.opt.emojisFile == null && main.opt.config.getEmojisFile() != null) {
+                main.opt.emojisFile = new File(main.opt.config.getEmojisFile());
+            }
             main.select(startTimer, shutdown, shutdownActions);
         } catch (Exception ex) {
             shutdown.completeExceptionally(ex);
@@ -328,6 +331,7 @@ public class Main {
 
     private void main0(TouchTimer startTimer,
                       CompletableFuture<Void> shutdown, Stack<ShutdownAction> shutdownActions) throws Exception {
+        final ConfigData config = opt.config;
 
         MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
 
@@ -351,25 +355,23 @@ public class Main {
         TelemetryStore telemetryStore = new TelemetryStore();
         mBeanServer.registerMBean(telemetryStore, telemetryStoreName);
 
-        Streamer streamer = new Streamer(vertx, opt.config);
+        Streamer streamer = new Streamer(vertx, config);
         mBeanServer.registerMBean(streamer, streamerName);
         startTimer.touch("streamer created");
 
         EmojiStore emojiStore = new EmojiStore();
         FortuneStore fortuneStore = new FortuneStore();
 
-        if (opt.config.getFortuneFiles() != null) {
-            for (String f : opt.config.getFortuneFiles()) {
-                fortuneStore.addFile(new File(f));
-            }
+        for (String f : Optional.ofNullable(config.getFortuneFiles()).map(Arrays::asList)
+                .orElse(Collections.emptyList())) {
+            fortuneStore.addFile(new File(f));
         }
 
-        ChatManager chatManager = new ChatManager(startTimer, emojiStore, fortuneStore, opt.config);
+        ChatManager chatManager = new ChatManager(startTimer, emojiStore, fortuneStore, config);
         mBeanServer.registerMBean(chatManager, chatManagerName);
         startTimer.touch("Chat manager created");
 
-        chatManager.addCustomEmojis(Optional.ofNullable(opt.emojisFile)
-                        .orElse(Optional.ofNullable(opt.config.getEmojisFile()).map(File::new).orElse(null)));
+        chatManager.addCustomEmojis(opt.emojisFile);
         startTimer.touch("after loading custom emojis");
 
         /* Now to setup the vertx router */
@@ -394,7 +396,7 @@ public class Main {
             router.failureHandler(ctx, handler);
         });
 
-        if (opt.config.isLogRequestInfo()) {
+        if (config.isLogRequestInfo()) {
             Optional.of((Handler<RoutingContext>) event -> {
                 HttpServerRequest request = event.request();
                 LOG.info("Got request: method={}, uri={}, headers={}",
@@ -420,7 +422,7 @@ public class Main {
 
         final int[] httpPort = new int[2];
 
-        if (opt.config.isDevelopment()) {
+        if (config.isDevelopment()) {
             Optional.of((Handler<RoutingContext>) event -> {
                 event.response().putHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "*");
                 event.next();
@@ -428,7 +430,7 @@ public class Main {
         }
 
         Optional.of(new StaticResourceHandler(vertx.getOrCreateContext())
-                        .setWebRoot(opt.config.getWebRootDir())
+                        .setWebRoot(config.getWebRootDir())
                         .setCachingEnabled(true)
                         .setCacheEntryTimeout(TimeUnit.HOURS.toMillis(2))
                         .setMaxAgeSeconds(TimeUnit.HOURS.toSeconds(2))
@@ -443,10 +445,10 @@ public class Main {
                         .setEnableRangeSupport(true))
                 .ifPresent(router::handler);
 
-        if (opt.config.getMediaRootDir() != null && !opt.config.getMediaRootDir().isEmpty()) {
-            File dir = new File(opt.config.getMediaRootDir());
+        if (config.getMediaRootDir() != null && !config.getMediaRootDir().isEmpty()) {
+            File dir = new File(config.getMediaRootDir());
             if (dir.isDirectory() && dir.canRead()) {
-                Optional.of(StaticHandler.create(FileSystemAccess.ROOT, opt.config.getMediaRootDir())
+                Optional.of(StaticHandler.create(FileSystemAccess.ROOT, config.getMediaRootDir())
                         .setCachingEnabled(true)
                         .setCacheEntryTimeout(TimeUnit.SECONDS.toMillis(10))
                         .setMaxAgeSeconds(2) // let us use 2 second segments
@@ -462,7 +464,7 @@ public class Main {
                     router.sslRouter.route("/media/*").handler(opt.isSslMedia() ? handler : new RedirectHandler(() -> httpPort[0]));
                 });
             } else {
-                LOG.warn("Media directory not found or not readable: {}", opt.config.getMediaRootDir());
+                LOG.warn("Media directory not found or not readable: {}", config.getMediaRootDir());
             }
         }
 
@@ -483,7 +485,7 @@ public class Main {
             httpsServerOptions.setTrustOptions(selfSignedCertificate.trustOptions());
         });
 
-        String bind = Optional.ofNullable(opt.config.getBind())
+        String bind = Optional.ofNullable(config.getBind())
                 .filter(value -> !value.isBlank())
                 .orElse("0.0.0.0");
 
@@ -525,7 +527,7 @@ public class Main {
                 .onSuccess(event -> {
                     startTimer.touch("Ports bound");
                     try {
-                        scheduleManager.start(opt.config, shutdownActions);
+                        scheduleManager.start(config, shutdownActions);
                     } catch (SchedulerException e) {
                         shutdown.completeExceptionally(e);
                         return;
