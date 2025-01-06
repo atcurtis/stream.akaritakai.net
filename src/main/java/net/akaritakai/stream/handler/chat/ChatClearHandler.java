@@ -4,10 +4,7 @@ import io.vertx.core.Vertx;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.http.HttpServerResponse;
 import net.akaritakai.stream.CheckAuth;
-import net.akaritakai.stream.chat.ChatManagerMBean;
-import net.akaritakai.stream.handler.AbstractBlockingHandler;
 import net.akaritakai.stream.models.chat.commands.ChatClearRequest;
-import net.akaritakai.stream.scheduling.Utils;
 import org.apache.commons.lang3.Validate;
 
 import javax.management.ObjectName;
@@ -16,13 +13,10 @@ import javax.management.ObjectName;
 /**
  * Handles the "POST /chat/clear" command.
  */
-public class ChatClearHandler extends AbstractBlockingHandler<ChatClearRequest> {
-
-  private final ObjectName _chat;
+public class ChatClearHandler extends AbstractChatHandler<ChatClearRequest> {
 
   public ChatClearHandler(ObjectName chat, CheckAuth checkAuth, Vertx vertx) {
-    super(ChatClearRequest.class, vertx, checkAuth);
-    _chat = chat;
+    super(ChatClearRequest.class, chat, vertx, checkAuth);
   }
 
   @Override
@@ -34,7 +28,7 @@ public class ChatClearHandler extends AbstractBlockingHandler<ChatClearRequest> 
   @Override
   protected void handleAuthorized(HttpServerRequest httpRequest, ChatClearRequest request, HttpServerResponse response) {
     executeBlocking(() -> {
-      Utils.beanProxy(_chat, ChatManagerMBean.class).clearChat();
+      chatManager().clearChat();
       return null;
     })
             .onSuccess(unused -> handleSuccess(response))

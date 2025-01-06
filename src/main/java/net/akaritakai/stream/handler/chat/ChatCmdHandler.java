@@ -13,11 +13,11 @@ import javax.management.ObjectName;
 
 
 /**
- * Handles the "POST /chat/write" command.
+ * Handles the "POST /chat/cmd" command.
  */
-public class ChatWriteHandler extends AbstractChatHandler<ChatWriteRequest> {
+public class ChatCmdHandler extends AbstractChatHandler<ChatWriteRequest> {
 
-  public ChatWriteHandler(ObjectName chat, Vertx vertx, CheckAuth checkAuth) {
+  public ChatCmdHandler(ObjectName chat, Vertx vertx, CheckAuth checkAuth) {
     super(ChatWriteRequest.class, chat, vertx, checkAuth);
   }
 
@@ -35,7 +35,7 @@ public class ChatWriteHandler extends AbstractChatHandler<ChatWriteRequest> {
               .message(request.getMessage())
               .source(Util.getIpAddressFromRequest(httpRequest))
               .build();
-      chatManager().sendMessage(sendRequest);
+      chatManager().sendCommand(sendRequest);
       return null;
     })
             .onSuccess(unused -> handleSuccess(response))

@@ -8,9 +8,11 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import net.akaritakai.stream.json.InetAddressToStringConverter;
 import net.akaritakai.stream.json.StringToInetAddressConverter;
+import net.akaritakai.stream.json.UuidToNullConverter;
 import net.akaritakai.stream.models.chat.ChatMessageType;
 
 import java.net.InetAddress;
+import java.util.UUID;
 
 
 @Value
@@ -24,6 +26,9 @@ public class ChatSendRequest extends ChatRequest {
 
   @JsonSerialize(converter = InetAddressToStringConverter.class)
   InetAddress source;
+
+  @JsonSerialize(converter = UuidToNullConverter.class)
+  UUID uuid;
 
   @JsonPOJOBuilder(withPrefix = "")
   public static class ChatSendRequestBuilder implements ChatSendRequestBuilderMixin {

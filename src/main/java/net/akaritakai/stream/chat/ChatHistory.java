@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
 import io.vertx.core.json.JsonObject;
 import net.akaritakai.stream.models.chat.ChatMessage;
 import net.akaritakai.stream.models.chat.ChatSequence;
+import net.akaritakai.stream.models.chat.ChatTarget;
 import net.akaritakai.stream.models.chat.request.ChatSendRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,6 +37,10 @@ public class ChatHistory {
   }
 
   public ChatMessage addMessage(ChatSendRequest request) {
+    return addMessage(request, null);
+  }
+
+  public ChatMessage addMessage(ChatSendRequest request, ChatTarget target) {
     ChatMessage message;
     if (request.getMessageType() == null) {
       throw new IllegalArgumentException("Malformed request");
@@ -54,6 +59,7 @@ public class ChatHistory {
           .message(request.getMessage())
           .timestamp(System.currentTimeMillis())
           .source(request.getSource())
+          .target(target)
           .build();
       _queue.add(message);
       LOG.info("addMessage({})", message);

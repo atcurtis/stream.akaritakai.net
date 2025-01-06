@@ -168,6 +168,14 @@ public class InitDB {
                 "    PRIMARY KEY (SCHED_NAME,LOCK_NAME)\n" +
                 ")");
 
+        statement.executeUpdate("\n" +
+                "CREATE TABLE EMOJIS\n" +
+                "  (\n" +
+                "    EMOJI_NAME VARCHAR(40) NOT NULL,\n" +
+                "    EMOJI_URL  VARCHAR(4000) NOT NULL, \n" +
+                "    PRIMARY KEY (EMOJI_NAME)\n" +
+                ")");
+
         connection.close();
     }
 }

@@ -63,7 +63,8 @@
         }
         return hash;
       }
-      this.selectedNickColor = this.nickColors[Math.abs(hashCode(this.nick)) % this.nickColors.length];
+      let i = this.nick.indexOf("\u2794");
+      this.selectedNickColor = this.nickColors[Math.abs(hashCode(i > 0 ? this.nick.substring(0, i) : this.nick)) % this.nickColors.length];
     },
     computed: {
       time() {

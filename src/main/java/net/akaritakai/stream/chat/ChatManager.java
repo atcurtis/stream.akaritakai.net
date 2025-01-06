@@ -6,18 +6,14 @@ import java.net.InetAddress;
 import java.net.URL;
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Predicate;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.netty.util.internal.StringUtil;
 import io.vertx.core.Vertx;
-import io.vertx.core.json.JsonObject;
 import net.akaritakai.stream.CheckAuth;
 import net.akaritakai.stream.config.ConfigData;
 import net.akaritakai.stream.debug.TouchTimer;
@@ -28,12 +24,13 @@ import net.akaritakai.stream.handler.chat.*;
 import net.akaritakai.stream.models.chat.ChatMessage;
 import net.akaritakai.stream.models.chat.ChatMessageType;
 import net.akaritakai.stream.models.chat.ChatSequence;
+import net.akaritakai.stream.models.chat.ChatTarget;
 import net.akaritakai.stream.models.chat.request.ChatJoinRequest;
 import net.akaritakai.stream.models.chat.request.ChatSendRequest;
 import net.akaritakai.stream.models.chat.response.ChatStatusResponse;
 import net.akaritakai.stream.scheduling.ScheduleManagerMBean;
 import net.akaritakai.stream.scheduling.Utils;
-import org.quartz.JobDataMap;
+import net.akaritakai.stream.telemetry.TelemetryStoreMBean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,21 +47,24 @@ public class ChatManager extends NotificationBroadcasterSupport implements ChatM
 
   private final AtomicReference<ChatHistory> _history = new AtomicReference<>(null);
 
-  private final ConcurrentMap<String, String> _customEmojiMap = new ConcurrentHashMap<>();
+  private final EmojiStore _emojiStore;
+  private final FortuneStore _fortunes;
 
   private final AtomicInteger _sequenceNumber = new AtomicInteger();
 
-  public ChatManager(TouchTimer startTimer, ConfigData config) {
-
+  public ChatManager(TouchTimer startTimer, EmojiStore emojiStore, ConfigData config) {
+    _emojiStore = emojiStore;
+      _fortunes = new FortuneStore();
   }
 
   public static void register(Vertx vertx, RouterHelper router, CheckAuth checkAuth, ObjectName chatManagerName) {
     router.registerPostApiHandler("/chat/clear", new ChatClearHandler(chatManagerName, checkAuth, vertx));
     router.registerPostApiHandler("/chat/disable", new ChatDisableHandler(chatManagerName, checkAuth, vertx));
     router.registerPostApiHandler("/chat/enable", new ChatEnableHandler(chatManagerName, checkAuth, vertx));
-    router.registerPostApiHandler("/chat/write", new ChatWriteHandler(chatManagerName, checkAuth));
-    router.registerPostApiHandler("/chat/emojis", new ChatListEmojisHandler(chatManagerName, checkAuth));
-    router.registerPostApiHandler("/chat/emoji", new ChatSetEmojiHandler(chatManagerName, checkAuth));
+    router.registerPostApiHandler("/chat/write", new ChatWriteHandler(chatManagerName, vertx, checkAuth));
+    router.registerPostApiHandler("/chat/cmd", new ChatCmdHandler(chatManagerName, vertx, checkAuth));
+    router.registerPostApiHandler("/chat/emojis", new ChatListEmojisHandler(chatManagerName, vertx, checkAuth));
+    router.registerPostApiHandler("/chat/emoji", new ChatSetEmojiHandler(chatManagerName, vertx, checkAuth));
     router.registerGetHandler("/chat", new ChatClientHandler(vertx, chatManagerName));
   }
 
@@ -84,6 +84,146 @@ public class ChatManager extends NotificationBroadcasterSupport implements ChatM
   }
 
   @Override
+  public void sendCommand(@Nonnull ChatSendRequest request) {
+    try {
+      String[] cmd = request.getMessage().split("\\s+", 2);
+      LOG.info("Command sent: {} {} ... \"{}\"", cmd[0], request.getSource(), request.getMessage());
+      ChatMessage message;
+      switch (cmd[0]) {
+        case "/help" ->
+          message = _history.get().addMessage(
+                  ChatSendRequest.builder()
+                          .messageType(ChatMessageType.TEXT)
+                          .message("Commands:\n  /ping ping test\n  /ip your ipaddr\n  /msg nick message")
+                          .nickname("\uD83E\uDD16")
+                          .source(Util.ANY)
+                          .build(),
+                  ChatTarget.builder()
+                          .uuid(request.getUuid())
+                          .build());
+        case "/ping" ->
+          message = _history.get().addMessage(
+                  ChatSendRequest.builder()
+                          .messageType(ChatMessageType.TEXT)
+                          .message("pong!")
+                          .nickname("\uD83E\uDD16")
+                          .source(Util.ANY)
+                          .build(),
+                  ChatTarget.builder()
+                          .uuid(request.getUuid())
+                          .build());
+        case "/ip" ->
+          message = _history.get().addMessage(
+                  ChatSendRequest.builder()
+                          .messageType(ChatMessageType.TEXT)
+                          .message(String.valueOf(request.getSource()))
+                          .nickname("\uD83E\uDD16")
+                          .source(Util.ANY)
+                          .build(),
+                  ChatTarget.builder()
+                          .uuid(request.getUuid())
+                          .build());
+        case "/online" ->
+                message = _history.get().addMessage(
+                        ChatSendRequest.builder()
+                                .messageType(ChatMessageType.TEXT)
+                                .message("There are "
+                                        + Utils.beanProxy(telemetryStoreName, TelemetryStoreMBean.class).size()
+                                        + " online")
+                                .nickname("\uD83E\uDD16")
+                                .source(Util.ANY)
+                                .build(),
+                        ChatTarget.builder()
+                                .uuid(request.getUuid())
+                                .build());
+        case "/me" ->
+                message = _history.get().addMessage(
+                        ChatSendRequest.builder()
+                                .messageType(ChatMessageType.TEXT)
+                                .message(" . o O (  " + cmd[1] + "  )")
+                                .nickname(request.getNickname())
+                                .source(request.getSource())
+                                .build());
+        case "/fortune" ->
+                message = _history.get().addMessage(
+                        ChatSendRequest.builder()
+                                .messageType(ChatMessageType.TEXT)
+                                .message(StringUtil.join("\n", _fortunes.randomFortune()).toString())
+                                .nickname("\uD83E\uDDDE")
+                                .source(request.getSource())
+                                .build());
+        case "/msg" -> {
+          String[] target = cmd[1].split("\\s+", 2);
+
+          ChatSendRequest chatSendRequest = ChatSendRequest.builder()
+                  .messageType(ChatMessageType.TEXT)
+                  .message(target[1])
+                  .nickname(request.getNickname() + "\u2794" + target[0])
+                  .source(request.getSource())
+                  .build();
+
+          scanForEmoji(_history.get(), chatSendRequest);
+
+          message = _history.get().addMessage(chatSendRequest,
+                  ChatTarget.builder()
+                          .nickname(Set.of(target[0], request.getNickname()))
+                          .build());
+        }
+        default ->
+          message = _history.get().addMessage(
+                  ChatSendRequest.builder()
+                          .messageType(ChatMessageType.TEXT)
+                          .message("Unknown command: " + cmd[0])
+                          .nickname("\uD83E\uDD16")
+                          .source(Util.ANY)
+                          .build(),
+                  ChatTarget.builder()
+                          .uuid(request.getUuid())
+                          .build());
+      }
+      Notification n = new AttributeChangeNotification(this, _sequenceNumber.getAndIncrement(), System.currentTimeMillis(),
+              "sendMessage", "Message", ChatMessage.class.getName(), null, message);
+      sendNotification(n);
+      return;
+    } catch (Exception ex) {
+      LOG.warn("Exception processing command {}", request, ex);
+      ChatMessage message = _history.get().addMessage(
+              ChatSendRequest.builder()
+                      .messageType(ChatMessageType.TEXT)
+                      .message("Error: " + ex.getClass().getSimpleName())
+                      .nickname("\uD83E\uDD16")
+                      .source(Util.ANY)
+                      .build(),
+              ChatTarget.builder()
+                      .uuid(request.getUuid())
+                      .build());
+      Notification n = new AttributeChangeNotification(this, _sequenceNumber.getAndIncrement(), System.currentTimeMillis(),
+              "sendMessage", "Message", ChatMessage.class.getName(), null, message);
+      sendNotification(n);
+    }
+  }
+
+  private void scanForEmoji(ChatHistory currentHistory, ChatSendRequest request) {
+    StringTokenizer st = new StringTokenizer(request.getMessage());
+    while (st.hasMoreTokens()) {
+      String token = st.nextToken();
+      if (!EmojiStore.isCustomEmoji(token)) {
+        continue;
+      }
+      Emoji emoji = _emojiStore.findCustomEmoji(token);
+      if (emoji != null && !currentHistory.isActiveEmoji(emoji.name, emoji.url)) {
+        sendMessage(ChatSendRequest.builder()
+                .messageType(ChatMessageType.EMOJI)
+                .nickname(emoji.name)
+                .message(emoji.url)
+                .source(Util.ANY)
+                .build());
+      }
+    }
+  }
+
+
+  @Override
   public void sendMessage(@Nonnull ChatSendRequest request) {
     LOG.debug("Got ChatSendRequest = {}", request);
     ChatHistory currentHistory = _history.get();
@@ -93,32 +233,7 @@ public class ChatManager extends NotificationBroadcasterSupport implements ChatM
       if (request.getMessageType() == ChatMessageType.EMOJI) {
         currentHistory.setActiveEmoji(request.getNickname(), request.getMessage());
       } else if (request.getMessageType() == ChatMessageType.TEXT) {
-        StringTokenizer st = new StringTokenizer(request.getMessage());
-        while (st.hasMoreTokens()) {
-          String token = st.nextToken();
-          if (!token.startsWith(":") || !token.endsWith(":")) {
-            continue;
-          }
-          if (!_customEmojiMap.containsKey(token)) {
-            int sep = token.indexOf("::");
-            if (sep < 1) {
-              continue;
-            }
-            token = token.substring(0, sep + 1);
-            if (!_customEmojiMap.containsKey(token)) {
-              continue;
-            }
-          }
-          String emoji = getCustomEmoji(token);
-          if (emoji != null && !currentHistory.isActiveEmoji(token, emoji)) {
-            sendMessage(ChatSendRequest.builder()
-                    .messageType(ChatMessageType.EMOJI)
-                    .nickname(token)
-                    .message(emoji)
-                    .source(Util.ANY)
-                    .build());
-          }
-        }
+        scanForEmoji(currentHistory, request);
       }
       ChatMessage message = currentHistory.addMessage(request);
       Notification n = new AttributeChangeNotification(this, _sequenceNumber.getAndIncrement(), System.currentTimeMillis(),
@@ -222,41 +337,18 @@ public class ChatManager extends NotificationBroadcasterSupport implements ChatM
 
   @Override
   public List<String> listEmojis(String regexp, int limit) {
-    return listEmojis(regexp != null && !regexp.isBlank() ? new Predicate<>() {
-      final Pattern pattern = Pattern.compile(regexp.trim(), Pattern.CASE_INSENSITIVE);
-
-      @Override
-      public boolean test(String s) {
-        return pattern.matcher(s).find();
-      }
-    } : any -> true, limit);
-  }
-
-  public List<String> listEmojis(Predicate<String> matcher, int limit) {
-      return _customEmojiMap.entrySet().stream()
-              .filter(entry -> matcher.test(entry.getKey()))
-              .limit(limit)
-              .sorted(Map.Entry.comparingByKey())
-              .map(this::toJson)
-              .collect(Collectors.toList());
-  }
-
-  private String toJson(Map.Entry<String, String> entry) {
-    return JsonObject.of("key", entry.getKey(), "value", entry.getValue()).toString();
+    return _emojiStore.listEmojis(regexp, limit).stream().map(Emoji::toString).collect(Collectors.toList());
   }
 
   @Override
   public void setCustomEmoji(String key, String url) {
-    if (key.startsWith(":") && key.endsWith(":")) {
-      _customEmojiMap.put(key, url);
-    } else {
-      throw new IllegalArgumentException("emoji starts and ends with a colon");
-    }
+    _emojiStore.setCustomEmoji(key, url);
   }
 
   @Override
   public String getCustomEmoji(String key) {
-    return _customEmojiMap.get(key);
+    Emoji emoji = _emojiStore.findCustomEmoji(key);
+    return emoji != null ? emoji.url : null;
   }
 
   @Override

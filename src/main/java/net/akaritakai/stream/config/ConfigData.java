@@ -17,6 +17,8 @@ public class ConfigData {
   int sslPort;
   String bind;
 
+  String discordToken;
+
   // Production mode S3 client settings (where to fetch metadata/media)
   boolean awsDirectory;
   String awsRegion;
@@ -32,6 +34,8 @@ public class ConfigData {
   boolean logRequestInfo;
 
   String emojisFile;
+
+  String[] fortuneFiles;
 
   @JsonPOJOBuilder(withPrefix = "")
   public static class ConfigDataBuilder {

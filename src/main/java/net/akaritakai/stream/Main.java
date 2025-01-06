@@ -19,6 +19,7 @@ import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.FileSystemAccess;
 import io.vertx.ext.web.handler.StaticHandler;
 import net.akaritakai.stream.chat.ChatManager;
+import net.akaritakai.stream.chat.EmojiStore;
 import net.akaritakai.stream.config.Config;
 import net.akaritakai.stream.config.ConfigData;
 import net.akaritakai.stream.config.ShutdownAction;
@@ -254,12 +255,14 @@ public class Main {
         shutdownActions.add(() -> vertx.close().toCompletionStage().toCompletableFuture().join());
 
         TelemetryStore telemetryStore = new TelemetryStore();
+        mBeanServer.registerMBean(telemetryStore, telemetryStoreName);
 
         Streamer streamer = new Streamer(vertx, config);
         mBeanServer.registerMBean(streamer, streamerName);
         startTimer.touch("streamer created");
 
-        ChatManager chatManager = new ChatManager(startTimer, config);
+        EmojiStore emojiStore = new EmojiStore();
+        ChatManager chatManager = new ChatManager(startTimer, emojiStore, config);
         mBeanServer.registerMBean(chatManager, chatManagerName);
         startTimer.touch("Chat manager created");
 

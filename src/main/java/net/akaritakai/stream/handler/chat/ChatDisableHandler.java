@@ -4,10 +4,7 @@ import io.vertx.core.Vertx;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.http.HttpServerResponse;
 import net.akaritakai.stream.CheckAuth;
-import net.akaritakai.stream.chat.ChatManagerMBean;
-import net.akaritakai.stream.handler.AbstractBlockingHandler;
 import net.akaritakai.stream.models.chat.commands.ChatDisableRequest;
-import net.akaritakai.stream.scheduling.Utils;
 import org.apache.commons.lang3.Validate;
 
 import javax.management.ObjectName;
@@ -16,13 +13,10 @@ import javax.management.ObjectName;
 /**
  * Handles the "POST /chat/disable" command.
  */
-public class ChatDisableHandler extends AbstractBlockingHandler<ChatDisableRequest> {
-
-  private final ObjectName _chat;
+public class ChatDisableHandler extends AbstractChatHandler<ChatDisableRequest> {
 
   public ChatDisableHandler(ObjectName chat, CheckAuth checkAuth, Vertx vertx) {
-    super(ChatDisableRequest.class, vertx, checkAuth);
-    _chat = chat;
+    super(ChatDisableRequest.class, chat, vertx, checkAuth);
   }
 
   @Override
@@ -33,7 +27,7 @@ public class ChatDisableHandler extends AbstractBlockingHandler<ChatDisableReque
 
   protected void handleAuthorized(HttpServerRequest httpRequest, ChatDisableRequest request, HttpServerResponse response) {
     executeBlocking(() -> {
-      Utils.beanProxy(_chat, ChatManagerMBean.class).disableChat();
+      chatManager().disableChat();
       return null;
     })
             .onSuccess(unused -> handleSuccess(response))
