@@ -118,30 +118,30 @@ public class TouchTimer {
     }
 
     protected void format(StringBuilder buffer, Object arg) {
-        if (arg instanceof Supplier) {
-            arg = ((Supplier<?>) arg).get();
+        if (arg instanceof Supplier<?> supplier) {
+            arg = supplier.get();
         }
         /*if (arg instanceof StringBuilderFormattable) {
             ((StringBuilderFormattable) arg).formatTo(buffer);
-        } else */if (arg instanceof LongSupplier) {
-            buffer.append(((LongSupplier) arg).getAsLong());
-        } else if (arg instanceof IntSupplier) {
-            buffer.append(((IntSupplier) arg).getAsInt());
-        } else if (arg instanceof DoubleSupplier) {
-            buffer.append(((DoubleSupplier) arg).getAsDouble());
-        } else if (arg instanceof BooleanSupplier) {
-            buffer.append(((BooleanSupplier) arg).getAsBoolean());
-        } else if (arg instanceof CharSequence) {
-            buffer.append((CharSequence) arg);
-        } else if (arg instanceof Number) {
+        } else */if (arg instanceof LongSupplier supplier) {
+            buffer.append(supplier.getAsLong());
+        } else if (arg instanceof IntSupplier supplier) {
+            buffer.append(supplier.getAsInt());
+        } else if (arg instanceof DoubleSupplier supplier) {
+            buffer.append(supplier.getAsDouble());
+        } else if (arg instanceof BooleanSupplier supplier) {
+            buffer.append(supplier.getAsBoolean());
+        } else if (arg instanceof CharSequence cs) {
+            buffer.append(cs);
+        } else if (arg instanceof Number number) {
             if (arg instanceof Integer) {
-                buffer.append((int) (Integer) arg);
+                buffer.append(number.intValue());
             } else if (arg instanceof Double) {
-                buffer.append((double) (Double) arg);
+                buffer.append(number.doubleValue());
             } else if (arg instanceof Float) {
-                buffer.append((float) (Float) arg);
+                buffer.append(number.floatValue());
             } else {
-                buffer.append(((Number) arg).longValue());
+                buffer.append(number.longValue());
             }
         } else {
             buffer.append(arg);

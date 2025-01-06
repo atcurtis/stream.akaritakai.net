@@ -527,12 +527,12 @@ public class IPAddressUtil {
     public static InetAddress toScopedAddress(InetAddress address)
             throws SocketException {
 
-        if (address instanceof Inet6Address && address.isLinkLocalAddress()
-                && ((Inet6Address) address).getScopeId() == 0) {
+        if (address instanceof Inet6Address ip6 && address.isLinkLocalAddress()
+                && ip6.getScopeId() == 0) {
 
-            InetAddress cached = null;
+            InetAddress cached;
             try {
-                cached = cache.computeIfAbsent(address, k -> findScopedAddress(k));
+                cached = cache.computeIfAbsent(address, IPAddressUtil::findScopedAddress);
             } catch (UncheckedIOException e) {
                 throw (SocketException)e.getCause();
             }
@@ -559,9 +559,9 @@ public class IPAddressUtil {
     private static InetAddress findScopedAddress(InetAddress address) {
         PrivilegedExceptionAction<List<InetAddress>> pa = () -> NetworkInterface.networkInterfaces()
                 .flatMap(NetworkInterface::inetAddresses)
-                .filter(a -> (a instanceof Inet6Address)
+                .filter(a -> (a instanceof Inet6Address ip6)
                         && address.equals(a)
-                        && ((Inet6Address) a).getScopeId() != 0)
+                        && ip6.getScopeId() != 0)
                 .collect(Collectors.toList());
         List<InetAddress> result;
         try {

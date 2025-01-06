@@ -19,8 +19,7 @@ public class ExceptionConverter extends StdConverter<Throwable, ExceptionEvent> 
             builder.cause(convert(ex.getCause()));
         }
         ArrayList<StackTraceEntry> entries = new ArrayList<>();
-        if (ex instanceof ScriptException) {
-            ScriptException se = (ScriptException) ex;
+        if (ex instanceof ScriptException se) {
             entries.add(StackTraceEntry.builder()
                             .fileName(se.getFileName())
                             .lineNumber(se.getLineNumber())

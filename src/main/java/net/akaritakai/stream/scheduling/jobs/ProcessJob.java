@@ -85,8 +85,8 @@ public class ProcessJob extends AbstractJob implements InterruptableJob, ScriptC
         engineScope.put("streamer", Utils.beanProxy(streamer, StreamerMBean.class));
 
         Object source = context.get("SOURCE");
-        if (source instanceof File) {
-            return scriptEngine.eval(new FileReader((File) source), this);
+        if (source instanceof File file) {
+            return scriptEngine.eval(new FileReader(file), this);
         }
         String stringSource = String.valueOf(source);
         if (stringSource.startsWith("file://")) {

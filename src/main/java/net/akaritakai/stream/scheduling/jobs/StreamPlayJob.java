@@ -67,10 +67,9 @@ public class StreamPlayJob extends AbstractStreamJob implements InterruptableJob
     public void handleNotification(Notification notification, Object handbackObject) {
         switch (notification.getMessage()) {
             case "StreamState":
-                if (!(handbackObject instanceof Handback)) {
+                if (!(handbackObject instanceof Handback handback)) {
                     return;
                 }
-                Handback handback = (Handback) handbackObject;
                 StreamState state = (StreamState) ((AttributeChangeNotification) notification).getNewValue();
                 if (handback.request.getName().equals(state.getMediaName())) {
                     return;
