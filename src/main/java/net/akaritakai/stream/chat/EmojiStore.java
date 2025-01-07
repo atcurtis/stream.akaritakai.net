@@ -101,6 +101,7 @@ public class EmojiStore {
         ArrayList<Emoji> list = new ArrayList<>();
         try (Connection conn = getConnection()) {
             Function.create(conn.unwrap(SQLiteConnection.class), "REGEXP", new Function() {
+
                 @Override
                 protected void xFunc() throws SQLException {
                     String expression = value_text(0);

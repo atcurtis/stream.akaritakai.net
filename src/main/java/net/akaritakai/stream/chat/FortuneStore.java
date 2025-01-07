@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
-public class FortuneStore {
+public class FortuneStore implements FortuneStoreMBean{
 
     private static final Logger LOG = LoggerFactory.getLogger(FortuneStore.class);
 
@@ -28,15 +28,17 @@ public class FortuneStore {
         }
     }
 
+    @Override
     public boolean removeFile(File file) {
         return _fortuneFiles.remove(file);
     }
 
+    @Override
     public boolean addFile(File file) {
         return _fortuneFiles.add(file);
     }
 
-
+    @Override
     public List<String> randomFortune() {
         long totalLength = _fortuneFiles.stream().mapToLong(File::length).sum();
         long randomPosition = _random.nextLong(totalLength);

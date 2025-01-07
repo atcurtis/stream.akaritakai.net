@@ -303,29 +303,28 @@ public class Main {
 
     private void select(TouchTimer startTimer,
                         CompletableFuture<Void> shutdown, Stack<ShutdownAction> shutdownActions) throws Exception {
-        switch ((Command) opt.command) {
-            case RUN -> main0(startTimer, shutdown, shutdownActions);
-            default -> {
-                String name = opt.command.toString();
-                int i = name.indexOf("_");
-                if (i < 0) {
-                    i = name.length();
-                }
-                String clsName = name.substring(0, 1) + name.substring(1, i).toLowerCase(Locale.US);
-                String methodName = "run";
-                if (i < name.length()) {
-                    methodName = name.substring(i + 1).toLowerCase();
-                }
-
-                Class<?> cls = Class.forName(getClass().getPackageName() + ".admin." + clsName);
-                Method method = cls.getMethod(methodName);
-
-                Object rc = method.invoke(cls.getConstructor(TouchTimer.class, Options.class, CompletableFuture.class, Stack.class)
-                        .newInstance(startTimer, opt, shutdown, shutdownActions));
-
-                exitCode = rc == null ? 0 : rc instanceof Number num ? num.intValue() : -1;
-                shutdown.complete(null);
+        if (Objects.requireNonNull((Command) opt.command) == Command.RUN) {
+            main0(startTimer, shutdown, shutdownActions);
+        } else {
+            String name = opt.command.toString();
+            int i = name.indexOf("_");
+            if (i < 0) {
+                i = name.length();
             }
+            String clsName = name.charAt(0) + name.substring(1, i).toLowerCase(Locale.US);
+            String methodName = "run";
+            if (i < name.length()) {
+                methodName = name.substring(i + 1).toLowerCase();
+            }
+
+            Class<?> cls = Class.forName(getClass().getPackageName() + ".admin." + clsName);
+            Method method = cls.getMethod(methodName);
+
+            Object rc = method.invoke(cls.getConstructor(TouchTimer.class, Options.class, CompletableFuture.class, Stack.class)
+                    .newInstance(startTimer, opt, shutdown, shutdownActions));
+
+            exitCode = rc == null ? 0 : rc instanceof Number num ? num.intValue() : -1;
+            shutdown.complete(null);
         }
     }
 
@@ -361,13 +360,14 @@ public class Main {
 
         EmojiStore emojiStore = new EmojiStore();
         FortuneStore fortuneStore = new FortuneStore();
+        mBeanServer.registerMBean(fortuneStore, fortuneStoreName);
 
         for (String f : Optional.ofNullable(config.getFortuneFiles()).map(Arrays::asList)
                 .orElse(Collections.emptyList())) {
             fortuneStore.addFile(new File(f));
         }
 
-        ChatManager chatManager = new ChatManager(startTimer, emojiStore, fortuneStore, config);
+        ChatManager chatManager = new ChatManager(startTimer, emojiStore, config);
         mBeanServer.registerMBean(chatManager, chatManagerName);
         startTimer.touch("Chat manager created");
 

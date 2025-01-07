@@ -6,13 +6,14 @@ import java.net.InetAddress;
 import java.net.URL;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.netty.util.internal.StringUtil;
 import io.vertx.core.Vertx;
 import net.akaritakai.stream.CheckAuth;
 import net.akaritakai.stream.config.ConfigData;
@@ -30,7 +31,6 @@ import net.akaritakai.stream.models.chat.request.ChatSendRequest;
 import net.akaritakai.stream.models.chat.response.ChatStatusResponse;
 import net.akaritakai.stream.scheduling.ScheduleManagerMBean;
 import net.akaritakai.stream.scheduling.Utils;
-import net.akaritakai.stream.telemetry.TelemetryStoreMBean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,13 +48,12 @@ public class ChatManager extends NotificationBroadcasterSupport implements ChatM
   private final AtomicReference<ChatHistory> _history = new AtomicReference<>(null);
 
   private final EmojiStore _emojiStore;
-  private final FortuneStore _fortunes;
 
   private final AtomicInteger _sequenceNumber = new AtomicInteger();
+  private final ConcurrentMap<String, ChatCommand> _commands = new ConcurrentHashMap<>();
 
-  public ChatManager(TouchTimer startTimer, EmojiStore emojiStore, FortuneStore fortuneStore, ConfigData config) {
+  public ChatManager(TouchTimer startTimer, EmojiStore emojiStore, ConfigData config) {
     _emojiStore = emojiStore;
-    _fortunes = fortuneStore;
   }
 
   public static void register(Vertx vertx, RouterHelper router, CheckAuth checkAuth, ObjectName chatManagerName) {
@@ -85,109 +84,65 @@ public class ChatManager extends NotificationBroadcasterSupport implements ChatM
 
   @Override
   public void sendCommand(@Nonnull ChatSendRequest request) {
+    ChatHistory history = _history.get();
+
+    if (history == null) {
+      throw new IllegalStateException("Chat is not enabled");
+    }
+
     try {
       String[] cmd = request.getMessage().split("\\s+", 2);
       LOG.info("Command sent: {} {} ... \"{}\"", cmd[0], request.getSource(), request.getMessage());
-      ChatMessage message;
-      switch (cmd[0]) {
-        case "/help" ->
-          message = _history.get().addMessage(
-                  ChatSendRequest.builder()
-                          .messageType(ChatMessageType.TEXT)
-                          .message("Commands:\n  /ping ping test\n  /ip your ipaddr\n  /msg nick message")
-                          .nickname("\uD83E\uDD16")
-                          .source(Util.ANY)
-                          .build(),
-                  ChatTarget.builder()
-                          .uuid(request.getUuid())
-                          .build());
-        case "/ping" ->
-          message = _history.get().addMessage(
-                  ChatSendRequest.builder()
-                          .messageType(ChatMessageType.TEXT)
-                          .message("pong!")
-                          .nickname("\uD83E\uDD16")
-                          .source(Util.ANY)
-                          .build(),
-                  ChatTarget.builder()
-                          .uuid(request.getUuid())
-                          .build());
-        case "/ip" ->
-          message = _history.get().addMessage(
-                  ChatSendRequest.builder()
-                          .messageType(ChatMessageType.TEXT)
-                          .message(String.valueOf(request.getSource()))
-                          .nickname("\uD83E\uDD16")
-                          .source(Util.ANY)
-                          .build(),
-                  ChatTarget.builder()
-                          .uuid(request.getUuid())
-                          .build());
-        case "/online" ->
-                message = _history.get().addMessage(
-                        ChatSendRequest.builder()
-                                .messageType(ChatMessageType.TEXT)
-                                .message("There are "
-                                        + Utils.beanProxy(telemetryStoreName, TelemetryStoreMBean.class).size()
-                                        + " online")
-                                .nickname("\uD83E\uDD16")
-                                .source(Util.ANY)
-                                .build(),
-                        ChatTarget.builder()
-                                .uuid(request.getUuid())
-                                .build());
-        case "/me" ->
-                message = _history.get().addMessage(
-                        ChatSendRequest.builder()
-                                .messageType(ChatMessageType.TEXT)
-                                .message(" . o O (  " + cmd[1] + "  )")
-                                .nickname(request.getNickname())
-                                .source(request.getSource())
-                                .build());
-        case "/fortune" ->
-                message = _history.get().addMessage(
-                        ChatSendRequest.builder()
-                                .messageType(ChatMessageType.TEXT)
-                                .message(StringUtil.join("\n", _fortunes.randomFortune()).toString())
-                                .nickname("\uD83E\uDDDE")
-                                .source(request.getSource())
-                                .build());
-        case "/msg" -> {
-          String[] target = cmd[1].split("\\s+", 2);
-
-          ChatSendRequest chatSendRequest = ChatSendRequest.builder()
-                  .messageType(ChatMessageType.TEXT)
-                  .message(target[1])
-                  .nickname(request.getNickname() + "\u2794" + target[0])
-                  .source(request.getSource())
-                  .build();
-
-          scanForEmoji(_history.get(), chatSendRequest);
-
-          message = _history.get().addMessage(chatSendRequest,
-                  ChatTarget.builder()
-                          .nickname(Set.of(target[0], request.getNickname()))
-                          .build());
-        }
-        default ->
-          message = _history.get().addMessage(
-                  ChatSendRequest.builder()
-                          .messageType(ChatMessageType.TEXT)
-                          .message("Unknown command: " + cmd[0])
-                          .nickname("\uD83E\uDD16")
-                          .source(Util.ANY)
-                          .build(),
-                  ChatTarget.builder()
-                          .uuid(request.getUuid())
-                          .build());
+      if (!cmd[0].startsWith("/")) {
+        throw new IllegalStateException();
       }
+      ChatCommand command = _commands.get(cmd[0]);
+      if (command == null) {
+        try {
+          String className = cmd[0].substring(1, 2).toUpperCase() + cmd[0].substring(2).toLowerCase();
+          Class<? extends ChatCommand> cmdClass = Class
+                  .forName(getClass().getPackageName() + ".command." + className)
+                  .asSubclass(ChatCommand.class);
+          command = cmdClass.getConstructor().newInstance();
+          if (!command.command().equalsIgnoreCase(cmd[0])) {
+            command = null;
+          } else {
+            _commands.putIfAbsent(command.command(), command);
+          }
+        } catch (ClassNotFoundException ex) {
+          LOG.debug("Not found command: {}", cmd[0], ex);
+        } catch (Exception ex) {
+          LOG.warn("Failed to instantiate command: {}", cmd[0], ex);
+        }
+      }
+
+      ChatMessage message;
+
+      if (command != null) {
+        message = command.execute(request, cmd.length == 2 ? cmd[1] : "", (chatSendRequest, chatTarget) -> {
+          scanForEmoji(history, chatSendRequest);
+          return history.addMessage(chatSendRequest, chatTarget);
+        });
+      } else {
+        message = history.addMessage(
+                ChatSendRequest.builder()
+                        .messageType(ChatMessageType.TEXT)
+                        .message("Unknown command: " + cmd[0])
+                        .nickname("\uD83E\uDD16")
+                        .source(Util.ANY)
+                        .build(),
+                ChatTarget.builder()
+                        .uuid(request.getUuid())
+                        .build());
+      }
+
       Notification n = new AttributeChangeNotification(this, _sequenceNumber.getAndIncrement(), System.currentTimeMillis(),
               "sendMessage", "Message", ChatMessage.class.getName(), null, message);
       sendNotification(n);
       return;
     } catch (Exception ex) {
       LOG.warn("Exception processing command {}", request, ex);
-      ChatMessage message = _history.get().addMessage(
+      ChatMessage message = history.addMessage(
               ChatSendRequest.builder()
                       .messageType(ChatMessageType.TEXT)
                       .message("Error: " + ex.getClass().getSimpleName())
