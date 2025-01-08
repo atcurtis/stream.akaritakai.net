@@ -135,7 +135,7 @@ public class Main {
                 .dest("configFile")
                 .help("Configuration file")
                 .metavar("FILE")
-                .type(File.class)
+                .type(Arguments.fileType().verifyIsFile().verifyCanRead())
                 .action(new LoadConfig());
         argumentParser.addArgument("-p", "--port")
                 .dest("port")
@@ -169,6 +169,7 @@ public class Main {
                 .setDefault(false)
                 .help("Media available on SSL");
         run.addArgument("--emojisFile")
+                .type(Arguments.fileType().verifyIsFile().verifyCanRead())
                 .dest("emojisFile")
                 .help("Custom emojis json file")
                 .metavar("FILE");

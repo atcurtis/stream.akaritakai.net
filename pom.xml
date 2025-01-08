@@ -16,7 +16,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <lombok.version>1.18.30</lombok.version>
         <vertx.version>4.5.11</vertx.version>
-        <graalvm.version>24.1.0</graalvm.version>
+        <rhino.version>24.1.1</rhino.version>
         <logback.version>1.5.16</logback.version>
     </properties>
 
@@ -127,35 +127,9 @@
         </dependency>
 
         <dependency>
-            <groupId>org.graalvm.polyglot</groupId>
-            <artifactId>polyglot</artifactId>
-            <version>${graalvm.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.graalvm.js</groupId>
-            <artifactId>js-scriptengine</artifactId>
-            <version>${graalvm.version}</version>
-        </dependency>
-        <!-- runtime -->
-        <dependency>
-            <groupId>org.graalvm.polyglot</groupId>
-            <artifactId>js-community</artifactId>
-            <version>${graalvm.version}</version>
-            <type>pom</type>
-            <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.graalvm.polyglot</groupId>
-            <artifactId>profiler-community</artifactId>
-            <version>${graalvm.version}</version>
-            <type>pom</type>
-            <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.graalvm.polyglot</groupId>
-            <artifactId>inspect-community</artifactId>
-            <version>${graalvm.version}</version>
-            <type>pom</type>
+            <groupId>org.mozilla</groupId>
+            <artifactId>rhino-engine</artifactId>
+            <version>1.8.0</version>
             <scope>runtime</scope>
         </dependency>
 
