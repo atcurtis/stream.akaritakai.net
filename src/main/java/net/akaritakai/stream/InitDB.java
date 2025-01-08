@@ -190,5 +190,22 @@ public class InitDB {
                 "    PRIMARY KEY (EMOJI_NAME)\n" +
                 ")");
 
+        if (!names.contains("STATE_STORE")) statement.executeUpdate("\n" +
+                "CREATE TABLE STATE_STORE\n" +
+                "  (\n" +
+                "    STATE_NAME VARCHAR(40) NOT NULL,\n" +
+                "    STATE_VALUE BLOB, \n" +
+                "    PRIMARY KEY (STATE_NAME)\n" +
+                ")");
+
+        if (!names.contains("SCRIPT_STORE")) statement.executeUpdate("\n" +
+                "CREATE TABLE SCRIPT_STORE\n" +
+                "  (\n" +
+                "    SCRIPT_NAME VARCHAR(40) NOT NULL,\n" +
+                "    SCRIPT_GROUP VARCHAR(40),\n" +
+                "    SCRIPT_TEXT TEXT, \n" +
+                "    PRIMARY KEY (SCRIPT_GROUP, SCRIPT_NAME)\n" +
+                ")");
+
     }
 }

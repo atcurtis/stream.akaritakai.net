@@ -20,6 +20,9 @@ public class TaskResult {
     boolean success;
 
     String output;
+    String outputClassName;
+
+    String stdout;
 
     //@JsonSerialize(converter = ExceptionConverter.class)
     ExceptionEvent exception;

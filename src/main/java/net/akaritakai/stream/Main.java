@@ -34,6 +34,7 @@ import net.akaritakai.stream.handler.telemetry.TelemetrySendHandler;
 import net.akaritakai.stream.log.DashboardLogAppender;
 import net.akaritakai.stream.net.DataUrlStreamHandlerFactory;
 import net.akaritakai.stream.scheduling.ScheduleManager;
+import net.akaritakai.stream.scheduling.StateStore;
 import net.akaritakai.stream.script.ScriptManager;
 import net.akaritakai.stream.streamer.Streamer;
 import net.akaritakai.stream.telemetry.TelemetryStore;
@@ -354,6 +355,9 @@ public class Main {
 
         TelemetryStore telemetryStore = new TelemetryStore();
         mBeanServer.registerMBean(telemetryStore, telemetryStoreName);
+
+        StateStore stateStore = new StateStore();
+        mBeanServer.registerMBean(stateStore, stateStoreName);
 
         Streamer streamer = new Streamer(vertx, config);
         mBeanServer.registerMBean(streamer, streamerName);
