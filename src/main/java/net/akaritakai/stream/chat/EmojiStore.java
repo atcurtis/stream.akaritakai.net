@@ -100,31 +100,38 @@ public class EmojiStore {
     public List<Emoji> listEmojis(String regexp, int limit) {
         ArrayList<Emoji> list = new ArrayList<>();
         try (Connection conn = getConnection()) {
-            Function.create(conn.unwrap(SQLiteConnection.class), "REGEXP", new Function() {
-
-                @Override
-                protected void xFunc() throws SQLException {
-                    String expression = value_text(0);
-                    String value = value_text(1);
-                    if (value == null)
-                        value = "";
-
-                    Pattern pattern = Pattern.compile(expression);
-                    result(pattern.matcher(value).find() ? 1 : 0);
-                }
-            });
-            try (PreparedStatement stmt = conn.prepareStatement(
-                     "SELECT EMOJI_NAME,EMOJI_URL FROM EMOJIS WHERE EMOJI_NAME REGEXP ? LIMIT " + limit
-             )) {
-                stmt.setString(1, regexp.trim());
-                try (ResultSet rs = stmt.executeQuery()) {
-                    while (rs.next()) {
-                        list.add(new Emoji(rs.getString(1), rs.getString(2)));
+            for (;;) {
+                try (PreparedStatement stmt = conn.prepareStatement(
+                        "SELECT EMOJI_NAME,EMOJI_URL FROM EMOJIS WHERE EMOJI_NAME REGEXP ? LIMIT " + limit
+                )) {
+                    stmt.setString(1, regexp.trim());
+                    try (ResultSet rs = stmt.executeQuery()) {
+                        while (rs.next()) {
+                            list.add(new Emoji(rs.getString(1), rs.getString(2)));
+                        }
+                        return list;
                     }
-                    return list;
+                } catch (SQLException ex) {
+                    if (ex.getCause() != null && ex.getCause().getMessage().contains("no such function: REGEXP")) {
+                        Function.create(conn.unwrap(SQLiteConnection.class), "REGEXP", new Function() {
+
+                            @Override
+                            protected void xFunc() throws SQLException {
+                                String expression = value_text(0);
+                                String value = value_text(1);
+                                if (value == null)
+                                    value = "";
+
+                                Pattern pattern = Pattern.compile(expression);
+                                result(pattern.matcher(value).find() ? 1 : 0);
+                            }
+                        });
+                    } else {
+                        throw ex;
+                    }
                 }
             }
-        } catch (SQLException ex) {
+        } catch (Exception ex) {
             LOG.warn("listEmojis", ex);
             return Collections.emptyList();
         }

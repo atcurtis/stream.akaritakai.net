@@ -12,6 +12,7 @@ import net.akaritakai.stream.script.ScriptManagerMBean;
 import net.akaritakai.stream.scheduling.Utils;
 import org.apache.commons.lang3.Validate;
 
+import java.util.Collections;
 import java.util.concurrent.Callable;
 
 import static net.akaritakai.stream.config.GlobalNames.scriptManagerName;
@@ -42,7 +43,7 @@ public class ExecuteHandler extends AbstractHandler<ExecuteRequest> {
                 .executeBlocking(() -> OBJECT_MAPPER
                         .writeValueAsString(ExecuteResponse.builder()
                                 .result(Utils.beanProxy(scriptManagerName, ScriptManagerMBean.class)
-                                        .executeTask(request.getTask()))
+                                        .executeTask(request.getTask(), Collections.emptyMap()))
                                 .build()))
                 .onSuccess(result -> handleSuccess(result, "text/json", response))
                 .onFailure(ex -> handleFailure("Failure executing script", response, ex));

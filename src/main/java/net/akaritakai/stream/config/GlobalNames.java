@@ -17,6 +17,7 @@ public final class GlobalNames {
     public static final ObjectName scheduleManagerName;
     public static final ObjectName telemetryStoreName;
     public static final ObjectName fortuneStoreName;
+    public static final ObjectName stateStoreName;
 
     static {
         try {
@@ -26,6 +27,7 @@ public final class GlobalNames {
             scheduleManagerName = new ObjectName("net.akaritakai.stream:type=ScheduleManager");
             telemetryStoreName = new ObjectName("net.akaritakai.stream:type=TelemetryStore");
             fortuneStoreName = new ObjectName("net.akaritakai.stream:type=FortuneStore");
+            stateStoreName = new ObjectName("net.akaritakai.stream:type=StateStore");
         } catch (MalformedObjectNameException e) {
             throw new RuntimeException(e);
         }
