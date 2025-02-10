@@ -39,7 +39,7 @@
     "eslint-plugin-vue": "^9.30.0",
     "file-loader": "^6.2.0",
     "mini-css-extract-plugin": "^2.9.2",
-    "ora": "^8.1.1",
+    "ora": "^8.2.0",
     "rimraf": "^6.0.1",
     "sass": "^1.83.1",
     "sass-loader": "^8.0.2",
