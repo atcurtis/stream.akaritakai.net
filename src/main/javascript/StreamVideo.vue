@@ -105,7 +105,7 @@
         'live'
       ]),
       ...mapState('prefs', ['volumePref']),
-      ...mapGetters('time', ['now'])
+      ...mapGetters('time', ['now','offset'])
     },
     data() {
       return {
@@ -214,9 +214,9 @@
           if (this.state === 'STARTED') {
             const startTime = this.startTime; // the time the stream started
             const seekTimeMs = this.seekTime; // where the stream was seeked to when the stream started
-            const now = new Date().getTime(); // the current time
-            const seekTime = ((now - startTime) + seekTimeMs) / 1000;
-            if (seekTime - this.player.currentTime() > 5) { // 5 second drift is too much
+            const now = new Date().getTime() + this.offset; // the current time
+            const seekTime = ((now - startTime) + seekTimeMs) / 1000.0;
+            if (seekTime - this.player.currentTime() > 2) { // 2 second drift is too much
               this.player.currentTime(seekTime);
             }
           }
@@ -309,8 +309,8 @@
         if (!this.live) { // The stream can only be seeked if it is pre-recorded
           const startTime = this.startTime; // the time the stream started
           const seekTimeMs = this.seekTime; // where the stream was seeked to when the stream started
-          const now = new Date().getTime(); // the current time
-          const seekTime = ((now - startTime) + seekTimeMs) / 1000;
+          const now = new Date().getTime() + this.offset; // the current time
+          const seekTime = ((now - startTime) + seekTimeMs) / 1000.0;
           this.player.currentTime(seekTime);
         }
       }
