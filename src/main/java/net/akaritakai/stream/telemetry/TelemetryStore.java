@@ -19,6 +19,7 @@ public class TelemetryStore implements TelemetryStoreMBean {
       .maximumSize(MAX_NUMBER_OF_USERS)
       .build();
 
+  @Override
   public Collection<TelemetryEvent> getTelemetry() {
     return Collections.unmodifiableCollection(_cache.asMap().values());
   }

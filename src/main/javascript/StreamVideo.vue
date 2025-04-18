@@ -180,7 +180,8 @@
       // Handle updating quality info
       this.player.on('progress', () => {
         try {
-          const hls = this.player.tech({ IWillNotUseThisInPlugins: true }).sourceHandler_.hls;
+          const player = this.player;
+          const hls = player.tech({ IWillNotUseThisInPlugins: true }).sourceHandler_.hls;
           const currentQuality = hls.levels[hls.currentLevel];
           const quality = () => {
             if (!currentQuality || !currentQuality.width || !currentQuality.height || !currentQuality.bitrate) {
@@ -193,9 +194,11 @@
             }
           }
           const bandwidth = () => isNaN(hls.bandwidthEstimate) ? null : Math.round(hls.bandwidthEstimate)
+          const position = () => player.currentTime();
           this.$store.dispatch('stream/updateQualityInfo', {
             quality: quality(),
-            bandwidth: bandwidth()
+            bandwidth: bandwidth(),
+            position: position()
           });
         } catch (_) {
           // No support for hls.js

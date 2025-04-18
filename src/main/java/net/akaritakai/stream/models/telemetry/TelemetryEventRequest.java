@@ -49,7 +49,8 @@ public class TelemetryEventRequest {
 
   // Video info
   @JsonInclude(JsonInclude.Include.NON_NULL) String videoQuality;
-  @JsonInclude(JsonInclude.Include.NON_NULL) Long clientBandwidth;
+  Long clientBandwidth;
+  Double videoPosition;
 
   @JsonPOJOBuilder(withPrefix = "")
   public static class TelemetryEventRequestBuilder implements TelemetryEventRequestBuilderMixin {

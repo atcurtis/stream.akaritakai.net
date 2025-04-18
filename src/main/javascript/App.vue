@@ -104,6 +104,7 @@
             chatNick: this.$store.state.nick.nick,
             videoQuality: this.$store.state.stream.quality,
             clientBandwidth: this.$store.state.stream.bandwidth,
+            videoPosition: this.$store.state.stream.position,
             muted: this.$store.state.stream.muted
           }));
           setTimeout(() => { this.sendTelemetry(socket)}, telemetryTimeout);
