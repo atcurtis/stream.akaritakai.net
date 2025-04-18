@@ -11,6 +11,7 @@
       <th style="width: 15em">Stream Muted</th>
       <th style="width: 25em">Quality</th>
       <th style="width: 25em">Bandwidth</th>
+      <th style="width: 25em">Position</th>
     </tr>
     <template v-for="t in telemetry">
       <tr>
@@ -26,6 +27,7 @@
           ? Math.round(t.request.clientBandwidth / 1000000) + " Mbps"
           : Math.round(t.request.clientBandwidth / 1000) + " Kbps")
           : "" }}</td>
+        <td>{{ t.request.videoPosition ? formatTime(t.request.videoPosition) : "" }}</td>
       </tr>
     </template>
     </tbody>
@@ -35,6 +37,7 @@
 <script>
   import {mapGetters, mapState} from 'vuex';
   import axios from 'axios';
+  import {Duration} from 'luxon';
 
   export default {
     name: 'stream-viewers',
@@ -48,6 +51,12 @@
       needApiKey() {
         return this.apiKey == null || this.apiKey.length === 0;
       },
+    },
+    methods: {
+      formatTime(seconds) {
+        const duration = Duration.fromMillis(1000 * seconds);
+        return duration.toFormat('hh:mm:ss.SSS');
+      }
     },
     mounted() {
       var self = this;

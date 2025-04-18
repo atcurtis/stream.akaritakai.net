@@ -9,6 +9,7 @@ const state = {
   seekTime: null,
   quality: null,
   bandwidth: null,
+  position: null,
   muted: null
 };
 
@@ -26,6 +27,7 @@ const mutations = {
   updateQualityInfo(state, newQualityInfo) {
     state.quality = newQualityInfo.quality;
     state.bandwidth = newQualityInfo.bandwidth;
+    state.position = newQualityInfo.position;
   },
   updateMutedInfo(state, newMutedInfo) {
     state.muted = newMutedInfo.muted;
