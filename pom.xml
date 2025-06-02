@@ -116,7 +116,7 @@
             <!-- required by quartz-scheduler -->
             <groupId>com.mchange</groupId>
             <artifactId>c3p0</artifactId>
-            <version>0.10.2</version>
+            <version>0.11.1</version>
             <scope>runtime</scope>
         </dependency>
 
