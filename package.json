@@ -36,7 +36,7 @@
     "@web/test-runner": "^0.20.0",
     "css-loader": "^7.1.2",
     "eslint": "^9.19.0",
-    "eslint-plugin-vue": "^9.30.0",
+    "eslint-plugin-vue": "^10.3.0",
     "file-loader": "^6.2.0",
     "mini-css-extract-plugin": "^2.9.2",
     "ora": "^8.1.1",
