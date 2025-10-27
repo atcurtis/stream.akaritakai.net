@@ -17,7 +17,7 @@
         <lombok.version>1.18.38</lombok.version>
         <vertx.version>4.5.13</vertx.version>
         <rhino.version>24.1.1</rhino.version>
-        <logback.version>1.5.18</logback.version>
+        <logback.version>1.5.20</logback.version>
     </properties>
 
     <dependencies>
